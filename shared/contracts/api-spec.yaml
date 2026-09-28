@@ -26,7 +26,17 @@ paths:
                 email: { type: string, format: email }
                 phone: { type: string }
       responses:
-        '202': { description: Link sent (always 202 to avoid account enumeration) }
+        '202':
+          description: |
+            Always 202, whether or not the email is registered, to avoid account enumeration.
+            In development only, the response includes `devLink` so you can sign in without email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent: { type: boolean }
+                  devLink: { type: string }
 
   /auth/magic-link/verify:
     post:
@@ -43,34 +53,56 @@ paths:
                 token: { type: string }
       responses:
         '200':
-          description: Signed in
+          description: 'Signed in. Send "Authorization: Bearer <accessToken>" on later requests.'
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  accessToken: { type: string }
-                  member: { $ref: '#/components/schemas/Member' }
-                  memberships:
-                    type: array
-                    items: { $ref: '#/components/schemas/TeamMembership' }
-        '401': { description: Invalid or expired token }
+              schema: { $ref: '#/components/schemas/AuthSession' }
+        '401': { description: Invalid, expired or already-used token }
+
+  /auth/logout:
+    post:
+      summary: End the current session
+      responses:
+        '204': { description: Signed out }
 
   /me:
     get:
-      summary: Current member with clubs, teams and roles
+      summary: Current member with club, teams and roles
       responses:
         '200':
           description: OK
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  member: { $ref: '#/components/schemas/Member' }
-                  memberships:
-                    type: array
-                    items: { $ref: '#/components/schemas/TeamMembership' }
+              schema: { $ref: '#/components/schemas/Me' }
+
+  /me/memberships:
+    get:
+      summary: My club memberships (subscription status)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MembershipRecord' } }
+
+  /members/{memberId}/invite:
+    parameters: [{ $ref: '#/components/parameters/memberId' }]
+    post:
+      summary: Email a member a magic link to join (manager of one of their teams)
+      responses:
+        '202': { description: Invite sent }
+        '403': { description: Not a manager of this member }
+
+  /clubs/{clubId}/membership-plans:
+    parameters: [{ $ref: '#/components/parameters/clubId' }]
+    get:
+      summary: Membership plans offered by the club
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MembershipPlan' } }
 
   /clubs/{clubId}/teams:
     parameters: [{ $ref: '#/components/parameters/clubId' }]
@@ -94,14 +126,18 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/PlayerProfile' } }
     post:
-      summary: Add a player to the squad (manager/admin)
+      summary: Add a new player to the squad (manager/admin)
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/PlayerProfile' }
+            schema: { $ref: '#/components/schemas/NewPlayer' }
       responses:
-        '201': { description: Created }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlayerProfile' }
 
   /teams/{teamId}/players/{memberId}:
     parameters:
@@ -113,14 +149,23 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/PlayerProfile' }
+            schema: { $ref: '#/components/schemas/PlayerProfileUpdate' }
       responses:
-        '200': { description: Updated }
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlayerProfile' }
 
   /teams/{teamId}/fixtures:
     parameters: [{ $ref: '#/components/parameters/teamId' }]
     get:
-      summary: Upcoming fixtures for a team
+      summary: Fixtures for a team, soonest first
+      parameters:
+        - name: from
+          in: query
+          description: Only fixtures starting at or after this time
+          schema: { type: string, format: date-time }
       responses:
         '200':
           description: OK
@@ -212,7 +257,7 @@ paths:
   /fixtures/{fixtureId}/lineup/share:
     parameters: [{ $ref: '#/components/parameters/fixtureId' }]
     post:
-      summary: Share the lineup with selected players
+      summary: Share the saved lineup with selected players (default everyone in it)
       requestBody:
         required: true
         content:
@@ -225,7 +270,15 @@ paths:
                   items: { type: string }
                   description: Omit to share with the whole squad
       responses:
-        '202': { description: Notifications queued }
+        '202':
+          description: Notifications sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sharedWith: { type: integer }
+        '409': { description: No saved lineup to share }
 
 components:
   securitySchemes:
@@ -361,6 +414,72 @@ components:
         substitutions: { type: array, items: { $ref: '#/components/schemas/Substitution' } }
         sharedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    NewPlayer:
+      type: object
+      required: [firstName, lastName, positions, skill, stamina]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        displayName: { type: string, description: 'Defaults to "First L."' }
+        shirtNumber: { type: integer }
+        positions: { type: array, items: { $ref: '#/components/schemas/PositionLine' } }
+        skill: { type: integer, minimum: 1, maximum: 10 }
+        stamina: { type: integer, minimum: 1, maximum: 10 }
+
+    PlayerProfileUpdate:
+      type: object
+      properties:
+        displayName: { type: string }
+        shirtNumber: { type: integer }
+        positions: { type: array, items: { $ref: '#/components/schemas/PositionLine' } }
+        skill: { type: integer, minimum: 1, maximum: 10 }
+        stamina: { type: integer, minimum: 1, maximum: 10 }
+        seasonMinutes: { type: integer, minimum: 0 }
+
+    Club:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+
+    Me:
+      type: object
+      required: [member, club, memberships, teams]
+      properties:
+        member: { $ref: '#/components/schemas/Member' }
+        club: { $ref: '#/components/schemas/Club' }
+        memberships: { type: array, items: { $ref: '#/components/schemas/TeamMembership' } }
+        teams: { type: array, items: { $ref: '#/components/schemas/Team' } }
+
+    AuthSession:
+      type: object
+      required: [accessToken, me]
+      properties:
+        accessToken: { type: string }
+        me: { $ref: '#/components/schemas/Me' }
+
+    MembershipPlan:
+      type: object
+      required: [id, clubId, name, amountPence, interval]
+      properties:
+        id: { type: string }
+        clubId: { type: string }
+        name: { type: string }
+        amountPence: { type: integer }
+        interval: { type: string, enum: [month, quarter, year] }
+
+    MembershipRecord:
+      type: object
+      required: [memberId, planId, status]
+      properties:
+        memberId: { type: string }
+        planId: { type: string }
+        status: { type: string, enum: [active, overdue, cancelled] }
+        nextPaymentDue: { type: string, format: date-time }
 
     SuggestionRequest:
       type: object

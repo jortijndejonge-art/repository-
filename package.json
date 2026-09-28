@@ -12,8 +12,10 @@
   ],
   "scripts": {
     "dev": "npm run dev -w app",
+    "dev:api": "npm run dev -w backend",
+    "db:seed": "npm run seed -w backend",
     "build": "npm run build -w app",
-    "test": "npm test -w shared/engine",
-    "typecheck": "npm run typecheck -w shared/engine && npm run typecheck -w app"
+    "test": "npm test -w shared/engine && npm test -w backend",
+    "typecheck": "npm run typecheck -w shared/engine && npm run typecheck -w backend && npm run typecheck -w app"
   }
 }
