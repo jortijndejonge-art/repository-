@@ -32,7 +32,7 @@ export function createMockClient(): ApiClient {
     mode: 'mock',
     async requestSignIn(email) {
       const member = demo.members.find((m) => m.email?.toLowerCase() === email.trim().toLowerCase());
-      return delay(member ? { devLink: `${location.origin}/auth/verify?token=mock:${member.id}` } : {});
+      return delay(member ? { devLink: `${location.origin}${import.meta.env.BASE_URL}auth/verify?token=mock:${member.id}` } : {});
     },
     async verifySignIn(token) {
       const id = token.replace(/^mock:/, '');

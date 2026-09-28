@@ -16,6 +16,7 @@ scheduling. The full plan (roadmap, business model, agent breakdown) lives in th
 | `backend/` | Node + Fastify API on PostgreSQL: magic-link sign-in, roles, players, availability, lineups, suggestions, sharing. |
 | `app/` | React + Vite web app: sign-in, **My matches** for players, **Lineup planner** for managers. |
 | `docs/tech-stack.md` | Stack decisions and the route to native apps. |
+| `docs/deploy.md` | **Working in VS Code, and auto-deploying to www.solarbytez.com/myhockey.** |
 
 ### In the app
 
@@ -78,6 +79,13 @@ API tests wipe and re-seed `TEST_DATABASE_URL`
 | `APP_URL` | `http://localhost:5173` | Web app address used in magic links |
 | `NODE_ENV` | — | Set `production` in production (turns off dev sign-in links) |
 | `MAGIC_LINK_TTL_MINUTES` / `SESSION_TTL_DAYS` | `15` / `30` | Link and session lifetimes |
+
+## Deploying
+
+Every push to `main` runs the tests and publishes the web app to
+**www.solarbytez.com/myhockey** (`.github/workflows/deploy.yml`). One-time server setup is in
+[docs/deploy.md](docs/deploy.md). To build for a sub-folder yourself:
+`VITE_BASE=/myhockey/ npm run build`.
 
 ## Before going live
 

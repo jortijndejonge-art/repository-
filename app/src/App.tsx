@@ -18,12 +18,18 @@ export function App() {
   );
 }
 
+/** Where the app is served from, e.g. "/" locally or "/myhockey/" on the website. */
+const BASE = import.meta.env.BASE_URL;
+
+/** Current path relative to BASE, always starting with "/". */
+const routePath = () => '/' + location.pathname.slice(BASE.length).replace(/^\/+/, '');
+
 function Root() {
   const { me, loading } = useAuth();
-  const [path, setPath] = useState(() => location.pathname);
+  const [path, setPath] = useState(routePath);
 
   const goHome = useCallback(() => {
-    history.replaceState(null, '', '/');
+    history.replaceState(null, '', BASE);
     setPath('/');
   }, []);
 

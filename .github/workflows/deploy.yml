@@ -1,0 +1,112 @@
+# Test on every push and pull request; on pushes to main, also build the web
+# app and upload it to the website (e.g. www.solarbytez.com/myhockey).
+#
+# One-time setup (GitHub repo → Settings → Secrets and variables → Actions):
+#   Secrets:   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_PATH
+#              optional: DEPLOY_PORT (default 22), DEPLOY_KNOWN_HOSTS
+#   Variables: optional SITE_BASE (default /myhockey/)
+#              optional VITE_API = http once the backend is hosted (default: demo mode)
+# See docs/deploy.md.
+
+name: Test and deploy
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hockey
+          POSTGRES_PASSWORD: hockey
+          POSTGRES_DB: hockey_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U hockey" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://hockey:hockey@localhost:5432/hockey_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SITE_BASE: ${{ vars.SITE_BASE || '/myhockey/' }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+    steps:
+      - name: Check deploy settings
+        id: check
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PATH" ]; then
+            echo "::notice::Deploy skipped: add the DEPLOY_* secrets (see docs/deploy.md) to publish the site."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Safety: the upload deletes files in DEPLOY_PATH that aren't in the build,
+          # so it must point at the app's own folder, never the website root.
+          folder="$(basename "${SITE_BASE%/}")"
+          if [ "$(basename "${DEPLOY_PATH%/}")" != "$folder" ]; then
+            echo "::error::DEPLOY_PATH must end in /$folder (the app's own folder), got: $DEPLOY_PATH"
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build web app
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_BASE: ${{ env.SITE_BASE }}
+          VITE_API: ${{ vars.VITE_API }}
+
+      - name: Upload to server
+        if: steps.check.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" > ~/.ssh/known_hosts
+          fi
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
+          rsync -rlvz --delete --chmod=D755,F644 \
+            -e "ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT" \
+            app/dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          echo "::notice::Deployed to $DEPLOY_HOST:$DEPLOY_PATH"

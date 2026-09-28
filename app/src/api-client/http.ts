@@ -2,8 +2,11 @@ import type { AuthSession } from '@hockey/contracts';
 import { sessionStore } from './session';
 import { ApiError, type ApiClient } from './types';
 
-/** Talks to the real backend (see /backend). Requests go to /api/v1, proxied by Vite in development. */
-export function createHttpClient(baseUrl = '/api/v1'): ApiClient {
+/**
+ * Talks to the real backend (see /backend). Requests go to <app base>/api/v1 —
+ * proxied by Vite in development, and by the web server in production.
+ */
+export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`): ApiClient {
   let token = sessionStore.get();
 
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
