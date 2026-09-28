@@ -1,0 +1,384 @@
+openapi: 3.1.0
+info:
+  title: Hockey Club Platform API
+  version: 0.1.0
+  description: |
+    Phase 1 (MVP) API: accounts & roles, player profiles, availability,
+    lineups and the suggestion engine. Schemas mirror shared/contracts/types.ts.
+    FROZEN — change deliberately and keep types.ts in sync.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/magic-link:
+    post:
+      summary: Send a magic sign-in link by email or SMS
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+                phone: { type: string }
+      responses:
+        '202': { description: Link sent (always 202 to avoid account enumeration) }
+
+  /auth/magic-link/verify:
+    post:
+      summary: Exchange a magic-link token for a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  member: { $ref: '#/components/schemas/Member' }
+                  memberships:
+                    type: array
+                    items: { $ref: '#/components/schemas/TeamMembership' }
+        '401': { description: Invalid or expired token }
+
+  /me:
+    get:
+      summary: Current member with clubs, teams and roles
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  member: { $ref: '#/components/schemas/Member' }
+                  memberships:
+                    type: array
+                    items: { $ref: '#/components/schemas/TeamMembership' }
+
+  /clubs/{clubId}/teams:
+    parameters: [{ $ref: '#/components/parameters/clubId' }]
+    get:
+      summary: List teams in a club
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Team' } }
+
+  /teams/{teamId}/players:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    get:
+      summary: Squad for a team
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/PlayerProfile' } }
+    post:
+      summary: Add a player to the squad (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlayerProfile' }
+      responses:
+        '201': { description: Created }
+
+  /teams/{teamId}/players/{memberId}:
+    parameters:
+      - { $ref: '#/components/parameters/teamId' }
+      - { $ref: '#/components/parameters/memberId' }
+    patch:
+      summary: Edit positions / ratings (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlayerProfile' }
+      responses:
+        '200': { description: Updated }
+
+  /teams/{teamId}/fixtures:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    get:
+      summary: Upcoming fixtures for a team
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Fixture' } }
+
+  /fixtures/{fixtureId}/availability:
+    parameters: [{ $ref: '#/components/parameters/fixtureId' }]
+    get:
+      summary: Availability of every squad member for a fixture
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Availability' } }
+    put:
+      summary: Set my (or my child's) availability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberId, status]
+              properties:
+                memberId: { type: string }
+                status: { $ref: '#/components/schemas/AvailabilityStatus' }
+                note: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Availability' }
+
+  /formations:
+    get:
+      summary: Available formations, optionally filtered by squad format
+      parameters:
+        - name: format
+          in: query
+          schema: { $ref: '#/components/schemas/SquadFormat' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Formation' } }
+
+  /fixtures/{fixtureId}/lineup:
+    parameters: [{ $ref: '#/components/parameters/fixtureId' }]
+    get:
+      summary: Current lineup for a fixture
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lineup' }
+        '404': { description: No lineup yet }
+    put:
+      summary: Save the lineup (manager)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Lineup' }
+      responses:
+        '200': { description: Saved }
+
+  /fixtures/{fixtureId}/lineup/suggest:
+    parameters: [{ $ref: '#/components/parameters/fixtureId' }]
+    post:
+      summary: Ask the suggestion engine for a lineup + substitution plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SuggestionRequest' }
+      responses:
+        '200':
+          description: Suggestion (not saved until the manager saves it)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuggestionResult' }
+
+  /fixtures/{fixtureId}/lineup/share:
+    parameters: [{ $ref: '#/components/parameters/fixtureId' }]
+    post:
+      summary: Share the lineup with selected players
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                memberIds:
+                  type: array
+                  items: { type: string }
+                  description: Omit to share with the whole squad
+      responses:
+        '202': { description: Notifications queued }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+
+  parameters:
+    clubId: { name: clubId, in: path, required: true, schema: { type: string } }
+    teamId: { name: teamId, in: path, required: true, schema: { type: string } }
+    memberId: { name: memberId, in: path, required: true, schema: { type: string } }
+    fixtureId: { name: fixtureId, in: path, required: true, schema: { type: string } }
+
+  schemas:
+    Role: { type: string, enum: [admin, manager, player, guardian] }
+    AgeGroup: { type: string, enum: [U8, U10, U12, U14, U16, U18, Adult] }
+    SquadFormat: { type: integer, enum: [5, 7, 11] }
+    PositionLine: { type: string, enum: [GK, DEF, MID, FWD] }
+    AvailabilityStatus: { type: string, enum: [available, unavailable, maybe, no_response] }
+    SuggestionStrategy: { type: string, enum: [fair, strongest, stamina] }
+
+    Member:
+      type: object
+      required: [id, clubId, firstName, lastName]
+      properties:
+        id: { type: string }
+        clubId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        phone: { type: string }
+
+    TeamMembership:
+      type: object
+      required: [teamId, memberId, roles]
+      properties:
+        teamId: { type: string }
+        memberId: { type: string }
+        roles: { type: array, items: { $ref: '#/components/schemas/Role' } }
+
+    Team:
+      type: object
+      required: [id, clubId, name, ageGroup, defaultFormat]
+      properties:
+        id: { type: string }
+        clubId: { type: string }
+        name: { type: string }
+        ageGroup: { $ref: '#/components/schemas/AgeGroup' }
+        defaultFormat: { $ref: '#/components/schemas/SquadFormat' }
+
+    PlayerProfile:
+      type: object
+      required: [memberId, displayName, positions, skill, stamina, seasonMinutes]
+      properties:
+        memberId: { type: string }
+        displayName: { type: string }
+        shirtNumber: { type: integer }
+        positions: { type: array, items: { $ref: '#/components/schemas/PositionLine' } }
+        skill: { type: integer, minimum: 1, maximum: 10 }
+        stamina: { type: integer, minimum: 1, maximum: 10 }
+        seasonMinutes: { type: integer, minimum: 0 }
+
+    Fixture:
+      type: object
+      required: [id, teamId, opponent, startsAt, venue, homeAway, format, durationMinutes, periods]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        opponent: { type: string }
+        startsAt: { type: string, format: date-time }
+        venue: { type: string }
+        homeAway: { type: string, enum: [home, away] }
+        format: { $ref: '#/components/schemas/SquadFormat' }
+        durationMinutes: { type: integer }
+        periods: { type: integer }
+
+    Availability:
+      type: object
+      required: [fixtureId, memberId, status, updatedAt]
+      properties:
+        fixtureId: { type: string }
+        memberId: { type: string }
+        status: { $ref: '#/components/schemas/AvailabilityStatus' }
+        note: { type: string }
+        updatedAt: { type: string, format: date-time }
+
+    FormationSlot:
+      type: object
+      required: [id, label, line, x, y]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        line: { $ref: '#/components/schemas/PositionLine' }
+        x: { type: number, description: '0–100, left to right' }
+        y: { type: number, description: '0–100, attacking D (top) to own goal (bottom)' }
+
+    Formation:
+      type: object
+      required: [id, name, format, slots]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        format: { $ref: '#/components/schemas/SquadFormat' }
+        slots: { type: array, items: { $ref: '#/components/schemas/FormationSlot' } }
+
+    SlotAssignment:
+      type: object
+      required: [slotId, memberId]
+      properties:
+        slotId: { type: string }
+        memberId: { type: [string, 'null'] }
+
+    Substitution:
+      type: object
+      required: [minute, slotId, offMemberId, onMemberId]
+      properties:
+        minute: { type: integer }
+        slotId: { type: string }
+        offMemberId: { type: string }
+        onMemberId: { type: string }
+
+    Lineup:
+      type: object
+      required: [id, fixtureId, formationId, strategy, starting, bench, substitutions, updatedAt]
+      properties:
+        id: { type: string }
+        fixtureId: { type: string }
+        formationId: { type: string }
+        strategy:
+          oneOf:
+            - { $ref: '#/components/schemas/SuggestionStrategy' }
+            - { type: string, enum: [manual] }
+        starting: { type: array, items: { $ref: '#/components/schemas/SlotAssignment' } }
+        bench: { type: array, items: { type: string } }
+        substitutions: { type: array, items: { $ref: '#/components/schemas/Substitution' } }
+        sharedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SuggestionRequest:
+      type: object
+      required: [fixtureId, formationId, strategy]
+      properties:
+        fixtureId: { type: string }
+        formationId: { type: string }
+        strategy: { $ref: '#/components/schemas/SuggestionStrategy' }
+        locked: { type: array, items: { $ref: '#/components/schemas/SlotAssignment' } }
+
+    SuggestionResult:
+      type: object
+      required: [starting, bench, substitutions, projectedMinutes, warnings]
+      properties:
+        starting: { type: array, items: { $ref: '#/components/schemas/SlotAssignment' } }
+        bench: { type: array, items: { type: string } }
+        substitutions: { type: array, items: { $ref: '#/components/schemas/Substitution' } }
+        projectedMinutes:
+          type: object
+          additionalProperties: { type: integer }
+        warnings: { type: array, items: { type: string } }

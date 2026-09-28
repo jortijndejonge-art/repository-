@@ -1,0 +1,17 @@
+{
+  "name": "hockey-club-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Field-hockey club management platform — web first, iOS/Android later.",
+  "workspaces": [
+    "shared/contracts",
+    "shared/engine",
+    "app"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w app",
+    "build": "npm run build -w app",
+    "test": "npm test -w shared/engine",
+    "typecheck": "npm run typecheck -w shared/engine && npm run typecheck -w app"
+  }
+}

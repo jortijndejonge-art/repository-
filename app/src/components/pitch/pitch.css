@@ -1,0 +1,75 @@
+.pitch {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 648 / 1072;
+  container-type: inline-size;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Token size scales with the pitch and the squad format. */
+.pitch--5 { --token: 15cqw; }
+.pitch--7 { --token: 13cqw; }
+.pitch--11 { --token: 10.5cqw; }
+
+.pitch__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pitch__surround { fill: var(--pitch-surround); }
+.pitch__band { fill: var(--pitch); }
+.pitch__band--alt { fill: var(--pitch-alt); }
+
+.pitch__lines {
+  fill: none;
+  stroke: var(--pitch-line);
+  stroke-width: 3;
+}
+.pitch__line--quarter { stroke-opacity: 0.55; }
+.pitch__dashed { stroke-dasharray: 10 12; stroke-opacity: 0.7; }
+.pitch__spot { fill: var(--pitch-line); stroke: none; }
+.pitch__d--attack { stroke: var(--teal); stroke-width: 4; }
+
+.pitch__goal { stroke-width: 3; }
+.pitch__goal--attack { fill: none; stroke: var(--teal); }
+.pitch__goal--own { fill: var(--pitch-line); stroke: var(--pitch-line); }
+
+.pitch__band-label {
+  fill: var(--pitch-line);
+  fill-opacity: 0.5;
+  font: 700 17px/1 var(--font);
+  letter-spacing: 3px;
+}
+
+.pitch__end-label {
+  fill: var(--teal);
+  font: 700 16px/1 var(--font);
+  letter-spacing: 2px;
+}
+.pitch__end-label--own { fill: var(--text-muted); }
+
+.pitch__direction {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.8;
+}
+
+.pitch__slots {
+  position: absolute;
+  inset: 0;
+}
+
+.pitch__slot {
+  position: absolute;
+  width: var(--token);
+  transform: translate(-50%, calc(var(--token) / -2));
+  display: flex;
+  justify-content: center;
+}

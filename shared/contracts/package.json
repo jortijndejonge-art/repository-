@@ -1,0 +1,9 @@
+{
+  "name": "@hockey/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FROZEN shared contract: TypeScript types + OpenAPI spec.",
+  "type": "module",
+  "main": "types.ts",
+  "types": "types.ts"
+}
