@@ -1,0 +1,36 @@
+.shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 12px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs button {
+  border: 0;
+  background: none;
+  padding: 10px 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+
+.tabs button.is-active {
+  color: var(--text);
+  border-bottom-color: var(--teal);
+}

@@ -1,0 +1,80 @@
+.auth {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.auth__card {
+  width: min(420px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth__card h1 {
+  font-size: 24px;
+}
+
+.auth__card p {
+  margin: 0;
+}
+
+.auth__logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 50% 72%, var(--pitch) 0 6px, transparent 6.5px),
+    radial-gradient(circle at 50% 0, transparent 0 15px, var(--teal) 15px 18px, transparent 18.5px),
+    var(--surface-2);
+}
+
+.auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth__form input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 44px;
+}
+
+.auth__form .btn {
+  min-height: 44px;
+}
+
+.auth__dev {
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px dashed var(--amber);
+  border-radius: 8px;
+  color: var(--amber);
+}
+
+.auth__dev a {
+  color: var(--teal);
+}
+
+.auth__demo {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth__demo-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

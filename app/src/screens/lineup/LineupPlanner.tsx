@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   AvailabilityStatus,
-  Club,
   Fixture,
   Formation,
   Id,
+  Me,
   PlayerProfile,
   SlotAssignment,
   SquadFormat,
@@ -12,8 +12,9 @@ import type {
   SuggestionStrategy,
   Team,
 } from '@hockey/contracts';
-import { positionFit } from '@hockey/engine';
-import { api } from '../../api-client';
+import { FORMATIONS, positionFit } from '@hockey/engine';
+import { api, type LineupDraft } from '../../api-client';
+import { managedTeams } from '../../core/auth';
 import { Pitch } from '../../components/pitch/Pitch';
 import { PlayerToken } from '../../components/pitch/PlayerToken';
 import { Segmented } from '../../core/Segmented';
@@ -60,12 +61,12 @@ function formatKickoff(iso: string) {
   });
 }
 
-export function LineupPlanner() {
+export function LineupPlanner({ me }: { me: Me }) {
   const toast = useToast();
-  const [club, setClub] = useState<Club | null>(null);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamId, setTeamId] = useState<Id>('u12');
+  const teams = useMemo(() => managedTeams(me), [me]);
+  const [teamId, setTeamId] = useState<Id>(() => (teams.find((t) => t.id === 'u12') ?? teams[0])?.id ?? '');
   const [fixture, setFixture] = useState<Fixture | null>(null);
+  const [noFixture, setNoFixture] = useState(false);
   const [squad, setSquad] = useState<PlayerProfile[]>([]);
   const [availability, setAvailability] = useState<Record<Id, AvailabilityStatus>>({});
   const [format, setFormat] = useState<SquadFormat>(7);
@@ -108,28 +109,44 @@ export function LineupPlanner() {
     [],
   );
 
-  // Initial load.
+  // Team change: load squad, next fixture, availability, and either the saved
+  // lineup or a fresh suggestion.
   useEffect(() => {
-    api.getClub().then(setClub);
-    api.getTeams().then(setTeams);
-  }, []);
-
-  // Team change: load squad, next fixture, availability, and suggest a first lineup.
-  useEffect(() => {
+    if (!teamId) return;
     let cancelled = false;
     (async () => {
-      const [players, fx] = await Promise.all([api.getSquad(teamId), api.getNextFixture(teamId)]);
-      const [avail, forms] = await Promise.all([api.getAvailability(fx.id), api.getFormations(fx.format)]);
+      const from = new Date(Date.now() - 3 * 3600_000).toISOString();
+      const [players, fixtures] = await Promise.all([api.getSquad(teamId), api.getFixtures(teamId, from)]);
+      const fx = fixtures[0];
+      if (!fx) {
+        if (!cancelled) {
+          setNoFixture(true);
+          setFixture(null);
+        }
+        return;
+      }
+      const [avail, saved] = await Promise.all([api.getAvailability(fx.id), api.getLineup(fx.id)]);
+      const savedFormation = saved ? FORMATIONS.find((f) => f.id === saved.formationId) : undefined;
+      const fmt = savedFormation?.format ?? fx.format;
+      const forms = await api.getFormations(fmt);
       if (cancelled) return;
-      const first = forms[0]!;
+      const formation = savedFormation ?? forms[0]!;
+      setNoFixture(false);
       setSquad(players);
       setFixture(fx);
       setAvailability(Object.fromEntries(avail.map((a) => [a.memberId, a.status])));
-      setFormat(fx.format);
+      setFormat(fmt);
       setFormations(forms);
-      setFormationId(first.id);
-      setLocks(new Set());
-      await runSuggest({ fixtureId: fx.id, formationId: first.id, strategy, locked: [] });
+      setFormationId(formation.id);
+      if (saved) {
+        // Keep the saved lineup exactly; just re-plan substitutions around it.
+        const kept = saved.starting.filter((s) => s.memberId);
+        setLocks(new Set(kept.map((s) => s.slotId)));
+        await runSuggest({ fixtureId: fx.id, formationId: formation.id, strategy, locked: kept });
+      } else {
+        setLocks(new Set());
+        await runSuggest({ fixtureId: fx.id, formationId: formation.id, strategy, locked: [] });
+      }
     })();
     return () => {
       cancelled = true;
@@ -235,22 +252,66 @@ export function LineupPlanner() {
     }
   };
 
-  const share = async (memberIds: Id[]) => {
-    if (!fixture || !formation || !plan) return;
-    await api.saveLineup({
-      id: `lineup-${fixture.id}`,
-      fixtureId: fixture.id,
-      formationId: formation.id,
-      strategy: locks.size ? 'manual' : strategy,
-      starting: lockedAssignments(assignments),
-      bench: bench.map((p) => p.memberId),
-      substitutions: plan.substitutions,
-      updatedAt: new Date().toISOString(),
-    });
-    await api.shareLineup(fixture.id, memberIds);
-    setShareOpen(false);
-    toast(`Lineup shared with ${memberIds.length} player${memberIds.length === 1 ? '' : 's'}`);
+  const draft = (): LineupDraft | null =>
+    formation && plan
+      ? {
+          formationId: formation.id,
+          strategy: locks.size ? 'manual' : strategy,
+          starting: formation.slots.map((s) => ({ slotId: s.id, memberId: assignments[s.id] ?? null })),
+          bench: bench.map((p) => p.memberId),
+          substitutions: plan.substitutions,
+        }
+      : null;
+
+  const save = async () => {
+    const d = draft();
+    if (!fixture || !d) return;
+    try {
+      await api.saveLineup(fixture.id, d);
+      toast('Lineup saved');
+    } catch (err) {
+      toast(`Couldn't save: ${(err as Error).message}`);
+    }
   };
+
+  const share = async (memberIds: Id[]) => {
+    const d = draft();
+    if (!fixture || !d) return;
+    try {
+      await api.saveLineup(fixture.id, d);
+      const { sharedWith } = await api.shareLineup(fixture.id, memberIds);
+      setShareOpen(false);
+      toast(`Lineup shared with ${sharedWith} player${sharedWith === 1 ? '' : 's'}`);
+    } catch (err) {
+      toast(`Couldn't share: ${(err as Error).message}`);
+    }
+  };
+
+  const teamPicker = (
+    <label className="field">
+      <span className="field__label">Team</span>
+      <select value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+        {teams.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
+  if (teams.length === 0) {
+    return <p className="muted">You don't manage any teams yet.</p>;
+  }
+
+  if (noFixture) {
+    return (
+      <div className="planner">
+        <section className="controls">{teamPicker}</section>
+        <p className="muted">No upcoming fixtures for this team.</p>
+      </div>
+    );
+  }
 
   if (!fixture || !formation) {
     return <div className="loading">Loading…</div>;
@@ -261,26 +322,6 @@ export function LineupPlanner() {
 
   return (
     <div className="planner">
-      <header className="topbar">
-        <div className="topbar__brand">
-          <span className="topbar__logo" aria-hidden="true" />
-          <div>
-            <div className="topbar__club">{club?.name}</div>
-            <h1 className="topbar__title">Lineup planner</h1>
-          </div>
-        </div>
-        <label className="field topbar__team">
-          <span className="field__label">Team</span>
-          <select value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </header>
-
       <section className="fixture" aria-label="Fixture">
         <div className="fixture__main">
           <span className={`pill pill--${fixture.homeAway}`}>{fixture.homeAway === 'home' ? 'Home' : 'Away'}</span>
@@ -295,6 +336,7 @@ export function LineupPlanner() {
       </section>
 
       <section className="controls" aria-label="Lineup options">
+        {teamPicker}
         <Segmented label="Format" options={FORMATS} value={format} onChange={(f) => changeFormation(f)} />
         <label className="field">
           <span className="field__label">Formation</span>
@@ -310,6 +352,9 @@ export function LineupPlanner() {
         <div className="controls__actions">
           <button type="button" className="btn btn--primary" onClick={suggest}>
             Suggest lineup
+          </button>
+          <button type="button" className="btn" onClick={save}>
+            Save
           </button>
           <button
             type="button"

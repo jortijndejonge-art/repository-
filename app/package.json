@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -p . && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "dev:http": "VITE_API=http vite"
   },
   "dependencies": {
     "@hockey/contracts": "0.1.0",
