@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@hockey/contracts": "0.1.0",
+    "@hockey/demo": "0.1.0",
     "@hockey/engine": "0.1.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

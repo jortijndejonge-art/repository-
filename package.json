@@ -2,10 +2,12 @@
   "name": "hockey-club-platform",
   "private": true,
   "version": "0.1.0",
-  "description": "Field-hockey club management platform — web first, iOS/Android later.",
+  "description": "Field-hockey club management platform \u2014 web first, iOS/Android later.",
   "workspaces": [
     "shared/contracts",
     "shared/engine",
+    "shared/demo",
+    "backend",
     "app"
   ],
   "scripts": {

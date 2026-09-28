@@ -1,0 +1,12 @@
+{
+  "name": "@hockey/demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Demo club data shared by the web app's mock API and the database seed.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@hockey/contracts": "0.1.0"
+  }
+}

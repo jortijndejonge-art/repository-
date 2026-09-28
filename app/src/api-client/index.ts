@@ -13,7 +13,7 @@ import type {
   Team,
 } from '@hockey/contracts';
 import { formationsFor, getFormation, suggestLineup } from '@hockey/engine';
-import * as seed from './seed';
+import * as seed from '@hockey/demo';
 
 /**
  * Typed API client mirroring shared/contracts/api-spec.yaml.

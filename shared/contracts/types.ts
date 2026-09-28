@@ -68,6 +68,35 @@ export interface PlayerProfile {
   seasonMinutes: number;
 }
 
+/** Adding a new player to a squad (creates the member, team membership and profile). */
+export interface NewPlayer {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  /** Defaults to "First L." */
+  displayName?: string;
+  shirtNumber?: number;
+  positions: PositionLine[];
+  skill: number;
+  stamina: number;
+}
+
+export type PlayerProfileUpdate = Partial<Omit<PlayerProfile, 'memberId'>>;
+
+/** The signed-in member with everything the app needs to start. */
+export interface Me {
+  member: Member;
+  club: Club;
+  memberships: TeamMembership[];
+  teams: Team[];
+}
+
+export interface AuthSession {
+  accessToken: string;
+  me: Me;
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures & availability
 // ---------------------------------------------------------------------------
