@@ -7,10 +7,11 @@
   -webkit-user-select: none;
 }
 
-/* Token size scales with the pitch and the squad format. */
-.pitch--5 { --token: 14cqw; }
-.pitch--7 { --token: 13cqw; }
-.pitch--11 { --token: 10.5cqw; }
+/* Token size scales with the pitch and the squad format — kept small enough
+   that neighbouring names never overlap, even in an 11-a-side back four. */
+.pitch--5 { --token: 13cqw; }
+.pitch--7 { --token: 11.5cqw; }
+.pitch--11 { --token: 9cqw; }
 
 .pitch__svg {
   position: absolute;

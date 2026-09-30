@@ -8,6 +8,7 @@ interface PlayerTokenProps extends HTMLAttributes<HTMLButtonElement> {
   outOfPosition?: boolean;
   selected?: boolean;
   dragging?: boolean;
+  /** Shown only in the aria-label — the Planned minutes panel already covers this on the token itself. */
   minutes?: number;
 }
 
@@ -59,7 +60,6 @@ export function PlayerToken({
         {slotLabel && <span className="token__slot">{slotLabel}</span>}
       </span>
       <span className="token__name">{player.displayName}</span>
-      {minutes !== undefined && <span className="token__minutes">{minutes}′</span>}
     </button>
   );
 }
