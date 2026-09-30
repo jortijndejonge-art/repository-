@@ -33,14 +33,16 @@ const GOAL = { x: 262, w: 76, depth: 22 };
 
 /**
  * Map a formation's y (0–100, bands at 33 / 66) onto the shortened pitch,
- * skipping the break so every line lands in its labelled band. In defence the
- * back line sits just below our 23 m line and the keeper high enough in the D
- * that their name stays on the pitch — room for both even at 5-a-side.
+ * skipping the break so every line lands in its labelled band. Forwards (0–33)
+ * sit just below the halfway line — that's the closest any player ever gets
+ * to it, so the whole lineup always stays in our half. In defence the back
+ * line sits just below our 23 m line and the keeper high enough in the D that
+ * their name stays on the pitch — room for both even at 5-a-side.
  */
+const FORWARD_Y = HALFWAY + 20;
 const Y_ANCHORS: [number, number][] = [
-  [0, 0],
-  [33, ATTACK_END],
-  [33, HALFWAY],
+  [0, FORWARD_Y],
+  [33, FORWARD_Y],
   [66, OUR_23],
   [80, 612],
   [100, 808],
