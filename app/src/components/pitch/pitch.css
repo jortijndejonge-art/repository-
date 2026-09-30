@@ -1,14 +1,14 @@
 .pitch {
   position: relative;
   width: 100%;
-  aspect-ratio: 648 / 1072;
+  aspect-ratio: 648 / 886;
   container-type: inline-size;
   user-select: none;
   -webkit-user-select: none;
 }
 
 /* Token size scales with the pitch and the squad format. */
-.pitch--5 { --token: 15cqw; }
+.pitch--5 { --token: 14cqw; }
 .pitch--7 { --token: 13cqw; }
 .pitch--11 { --token: 10.5cqw; }
 
@@ -23,6 +23,8 @@
 .pitch__surround { fill: var(--pitch-surround); }
 .pitch__band { fill: var(--pitch); }
 .pitch__band--alt { fill: var(--pitch-alt); }
+/* The shortened stretch between the attacking 23 m line and halfway. */
+.pitch__gap { fill: var(--pitch-surround); }
 
 .pitch__lines {
   fill: none;
@@ -30,13 +32,25 @@
   stroke-width: 3;
 }
 .pitch__line--quarter { stroke-opacity: 0.55; }
-.pitch__dashed { stroke-dasharray: 10 12; stroke-opacity: 0.7; }
 .pitch__spot { fill: var(--pitch-line); stroke: none; }
 .pitch__d--attack { stroke: var(--teal); stroke-width: 4; }
 
-.pitch__goal { stroke-width: 3; }
-.pitch__goal--attack { fill: none; stroke: var(--teal); }
-.pitch__goal--own { fill: var(--pitch-line); stroke: var(--pitch-line); }
+.pitch__goal {
+  fill: url(#goal-net);
+  stroke: var(--pitch-line);
+  stroke-width: 3;
+}
+.pitch__net-bg { fill: var(--goal-net); }
+.pitch__net-line { stroke: var(--goal-net-line); stroke-width: 1.4; fill: none; }
+
+/* "//" break marks: a surround-coloured gap cutting the side line, edged by two strokes. */
+.pitch__break {
+  stroke: var(--pitch-line);
+  stroke-width: 3;
+  stroke-linecap: round;
+  fill: none;
+}
+.pitch__break-gap { fill: var(--pitch-surround); stroke: none; }
 
 .pitch__band-label {
   fill: var(--pitch-line);
@@ -44,13 +58,6 @@
   font: 700 17px/1 var(--font);
   letter-spacing: 3px;
 }
-
-.pitch__end-label {
-  fill: var(--teal);
-  font: 700 16px/1 var(--font);
-  letter-spacing: 2px;
-}
-.pitch__end-label--own { fill: var(--text-muted); }
 
 .pitch__direction {
   fill: none;
