@@ -1,7 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { Fixture, Id, Me, Team, TrainingSession } from '@hockey/contracts';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { EventKind, Fixture, Id, Me, Team, TrainingSession } from '@hockey/contracts';
 import { api } from '../../api-client';
+import { EventChat } from '../chat/EventChat';
 import './calendar.css';
+
+/** Your teams plus your children's, once each: everything whose schedule (and chats) you follow. */
+export function followedTeams(me: Me): Team[] {
+  const all = [...me.teams, ...me.children.flatMap((c) => c.teams)];
+  return all.filter((t, i) => all.findIndex((u) => u.id === t.id) === i);
+}
+
+/** How often the calendar refreshes its unread-message counts. */
+const UNREAD_POLL_MS = 30000;
 
 type Entry =
   | { kind: 'match'; at: string; team: Team; fixture: Fixture }
@@ -16,6 +26,20 @@ export function Calendar({ me }: { me: Me }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [teamId, setTeamId] = useState<Id | 'all'>('all');
   const [failed, setFailed] = useState(false);
+  const teams = useMemo(() => followedTeams(me), [me]);
+  const [unread, setUnread] = useState<Record<string, number>>({});
+  const [chat, setChat] = useState<{ kind: EventKind; eventId: Id; title: string; subtitle: string } | null>(null);
+
+  const loadUnread = useCallback(async () => {
+    const lists = await Promise.all(teams.map((t) => api.getChatUnread(t.id).catch(() => [])));
+    setUnread(Object.fromEntries(lists.flat().map((u) => [`${u.kind}:${u.eventId}`, u.unread])));
+  }, [teams]);
+
+  useEffect(() => {
+    loadUnread();
+    const timer = setInterval(() => document.visibilityState === 'visible' && loadUnread(), UNREAD_POLL_MS);
+    return () => clearInterval(timer);
+  }, [loadUnread]);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +47,7 @@ export function Calendar({ me }: { me: Me }) {
       // Include things that started in the last few hours.
       const from = new Date(Date.now() - 3 * 3600_000).toISOString();
       const perTeam = await Promise.all(
-        me.teams.map(async (team): Promise<Entry[]> => {
+        teams.map(async (team): Promise<Entry[]> => {
           const [fixtures, sessions] = await Promise.all([api.getFixtures(team.id, from), api.getTrainingSessions(team.id, from)]);
           return [
             ...fixtures.map((fixture) => ({ kind: 'match' as const, at: fixture.startsAt, team, fixture })),
@@ -36,7 +60,7 @@ export function Calendar({ me }: { me: Me }) {
     return () => {
       cancelled = true;
     };
-  }, [me]);
+  }, [teams]);
 
   const shown = useMemo(() => (entries ?? []).filter((e) => teamId === 'all' || e.team.id === teamId), [entries, teamId]);
   const days = useMemo(() => {
@@ -55,11 +79,11 @@ export function Calendar({ me }: { me: Me }) {
 
   return (
     <section className="calendar">
-      {me.teams.length > 1 && (
+      {teams.length > 1 && (
         <div className="calendar__bar">
           <select value={teamId} aria-label="Team" onChange={(e) => setTeamId(e.target.value)}>
             <option value="all">All my teams</option>
-            {me.teams.map((t) => (
+            {teams.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
               </option>
@@ -97,11 +121,41 @@ export function Calendar({ me }: { me: Me }) {
                   )}
                 </div>
                 <span className={`calendar__tag calendar__tag--${e.kind}`}>{e.kind === 'match' ? 'Match' : 'Training'}</span>
+                <ChatButton
+                  unread={unread[`${e.kind}:${e.kind === 'match' ? e.fixture.id : e.session.id}`] ?? 0}
+                  onOpen={() =>
+                    setChat(
+                      e.kind === 'match'
+                        ? { kind: 'match', eventId: e.fixture.id, title: `${e.team.name} vs ${e.fixture.opponent}`, subtitle: `${day(e.at)}, ${time(e.at)} · ${e.fixture.venue}` }
+                        : { kind: 'training', eventId: e.session.id, title: `${e.team.name} training`, subtitle: `${day(e.at)}, ${time(e.at)} · ${e.session.venue}` },
+                    )
+                  }
+                />
               </li>
             ))}
           </ul>
         </div>
       ))}
+
+      {chat && (
+        <EventChat
+          me={me}
+          {...chat}
+          onClose={() => {
+            setChat(null);
+            loadUnread();
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+function ChatButton({ unread, onOpen }: { unread: number; onOpen: () => void }) {
+  return (
+    <button type="button" className="btn calendar__chat" onClick={onOpen} aria-label={unread ? `Chat, ${unread} unread` : 'Chat'}>
+      Chat
+      {unread > 0 && <span className="calendar__badge">{unread > 99 ? '99+' : unread}</span>}
+    </button>
   );
 }

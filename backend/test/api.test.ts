@@ -463,7 +463,9 @@ describe('training sessions', () => {
     const url = `/api/v1/training/${created.id}`;
 
     const before = (await app.inject({ method: 'GET', url: `${url}/responses`, headers: as(coach) })).json();
-    expect(before).toHaveLength(u12Players.length);
+    // The live squad: an earlier test adds a player to U12.
+    const squadSize = (await app.inject({ method: 'GET', url: '/api/v1/teams/u12/players', headers: as(coach) })).json().length;
+    expect(before).toHaveLength(squadSize);
     expect(before.every((r: { rsvp: string }) => r.rsvp === 'no_response')).toBe(true);
 
     const rsvp = await app.inject({ method: 'PUT', url: `${url}/rsvp`, headers: as(p), payload: { memberId: player.memberId, status: 'available' } });
@@ -538,7 +540,8 @@ describe('season stats', () => {
     const stats = (await app.inject({ method: 'GET', url: '/api/v1/teams/u12/stats', headers: as(coach) })).json();
     const mine = stats.find((s: { memberId: string }) => s.memberId === player.memberId);
     const other = stats.find((s: { memberId: string }) => s.memberId === teammate.memberId);
-    expect(stats).toHaveLength(u12Players.length);
+    const squadSize = (await app.inject({ method: 'GET', url: '/api/v1/teams/u12/players', headers: as(coach) })).json().length;
+    expect(stats).toHaveLength(squadSize);
     expect(mine).toMatchObject({ trainingAttended: 1, trainingTotal: 1 });
     expect(other).toMatchObject({ trainingAttended: 0, trainingTotal: 1 });
 
@@ -546,5 +549,128 @@ describe('season stats', () => {
     for (const s of [past, unrecorded, future]) {
       await app.inject({ method: 'DELETE', url: `/api/v1/training/${s.id}`, headers: as(coach) });
     }
+  });
+});
+
+describe('event chat', () => {
+  const matchChat = `/api/v1/events/match/${U12_FIXTURE}/chat`;
+  const outsider = demo.members.find((m) => m.id === demo.squads.u16![3]!.memberId)!.email!;
+  const post = (headers: Record<string, string>, url: string, body: string) => app.inject({ method: 'POST', url, headers, payload: { body } });
+
+  /** The coach links a parent to `player`; returns the parent's session. */
+  async function parentOfPlayer() {
+    const coach = await signIn('coach@example.com');
+    const link = await app.inject({
+      method: 'POST',
+      url: `/api/v1/teams/u12/players/${player.memberId}/guardians`,
+      headers: as(coach),
+      payload: { firstName: 'Pat', lastName: 'Parent', email: 'pat.parent@example.com' },
+    });
+    expect([200, 201]).toContain(link.statusCode);
+    return signIn('pat.parent@example.com');
+  }
+
+  it('lets players, their parents and managers talk on a match, and keeps everyone else out', async () => {
+    const p = await signIn(playerEmail);
+    const parent = await parentOfPlayer();
+    const coach = await signIn('coach@example.com');
+
+    const mine = await post(as(p), matchChat, '  Can someone give me a lift?  ');
+    expect(mine.statusCode).toBe(201);
+    expect(mine.json()).toMatchObject({ body: 'Can someone give me a lift?', authorRole: 'Player' });
+
+    // Parents see their child's schedule and join the chat.
+    expect((await app.inject({ method: 'GET', url: '/api/v1/teams/u12/fixtures', headers: as(parent) })).statusCode).toBe(200);
+    const reply = await post(as(parent), matchChat, 'I can take two');
+    expect(reply.json()).toMatchObject({ authorName: 'Pat Parent', authorRole: `Parent of ${player.displayName}` });
+
+    const thread = (await app.inject({ method: 'GET', url: matchChat, headers: as(coach) })).json();
+    expect(thread.canModerate).toBe(true);
+    expect(thread.messages.map((m: { body: string }) => m.body)).toEqual(['Can someone give me a lift?', 'I can take two']);
+
+    // Someone from another team can't read or post, and empty messages are refused.
+    const out = await signIn(outsider);
+    expect((await app.inject({ method: 'GET', url: matchChat, headers: as(out) })).statusCode).toBe(403);
+    expect((await post(as(out), matchChat, 'hi')).statusCode).toBe(403);
+    expect((await post(as(p), matchChat, '   ')).statusCode).toBe(400);
+    expect((await app.inject({ method: 'GET', url: '/api/v1/events/match/nope/chat', headers: as(p) })).statusCode).toBe(404);
+  });
+
+  it('counts unread messages until the chat is opened, not counting your own', async () => {
+    const p = await signIn(playerEmail);
+    const coach = await signIn('coach@example.com');
+    await app.inject({ method: 'GET', url: matchChat, headers: as(coach) }); // caught up
+    await post(as(p), matchChat, 'See you at 10');
+
+    const unread = (await app.inject({ method: 'GET', url: '/api/v1/teams/u12/chat-unread', headers: as(coach) })).json();
+    expect(unread.find((u: { eventId: string }) => u.eventId === U12_FIXTURE)).toMatchObject({ kind: 'match', unread: 1 });
+    const own = (await app.inject({ method: 'GET', url: '/api/v1/teams/u12/chat-unread', headers: as(p) })).json();
+    expect(own.find((u: { eventId: string }) => u.eventId === U12_FIXTURE).unread).toBe(0);
+
+    await app.inject({ method: 'GET', url: matchChat, headers: as(coach) });
+    const after = (await app.inject({ method: 'GET', url: '/api/v1/teams/u12/chat-unread', headers: as(coach) })).json();
+    expect(after.find((u: { eventId: string }) => u.eventId === U12_FIXTURE).unread).toBe(0);
+  });
+
+  it('lets a manager post the saved lineup as a card with names and numbers only', async () => {
+    const coach = await signIn('coach@example.com');
+    const plan: SuggestionResult = (
+      await app.inject({ method: 'POST', url: `/api/v1/fixtures/${U12_FIXTURE}/lineup/suggest`, headers: as(coach), payload: { formationId: '7-2-2-2', strategy: 'fair' } })
+    ).json();
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/fixtures/${U12_FIXTURE}/lineup`,
+      headers: as(coach),
+      payload: { formationId: '7-2-2-2', strategy: 'fair', starting: plan.starting, bench: plan.bench, substitutions: plan.substitutions },
+    });
+
+    const p = await signIn(playerEmail);
+    const url = `/api/v1/fixtures/${U12_FIXTURE}/lineup/chat`;
+    expect((await app.inject({ method: 'POST', url, headers: as(p) })).statusCode).toBe(403);
+
+    const res = await app.inject({ method: 'POST', url, headers: as(coach), payload: { note: 'Here is Saturday' } });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ body: 'Here is Saturday', authorRole: 'Manager', lineup: { formation: { id: '7-2-2-2' }, opponent: 'Northgate HC' } });
+    expect(res.body).not.toMatch(/skill|stamina|seasonMinutes|email/);
+
+    // The player sees it in the chat.
+    const thread = (await app.inject({ method: 'GET', url: matchChat, headers: as(p) })).json();
+    const card = thread.messages.at(-1).lineup;
+    expect(card.bench).toEqual(plan.bench);
+    expect(card.players.length).toBe(new Set([...plan.starting.map((s) => s.memberId).filter(Boolean), ...plan.bench]).size);
+    const total = Object.values(card.minutes as Record<string, number>).reduce((a, b) => a + b, 0);
+    expect(total).toBe(plan.starting.filter((s) => s.memberId).length * card.durationMinutes);
+
+    // Needs a saved lineup.
+    expect((await app.inject({ method: 'POST', url: '/api/v1/fixtures/fx-u8/lineup/chat', headers: as(coach) })).statusCode).toBe(409);
+  });
+
+  it('keeps training chats separate, and lets people remove their own messages (managers any)', async () => {
+    const coach = await signIn('coach@example.com');
+    const p = await signIn(playerEmail);
+    const parent = await signIn('pat.parent@example.com');
+    const session = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/v1/teams/u12/training',
+        headers: as(coach),
+        payload: { startsAt: '2030-06-01T17:30:00.000Z', durationMinutes: 60, venue: 'Test Astro' },
+      })
+    ).json();
+    const trainingChat = `/api/v1/events/training/${session.id}/chat`;
+
+    const fromParent = (await post(as(parent), trainingChat, 'Running 5 minutes late')).json();
+    const fromPlayer = (await post(as(p), trainingChat, 'Same')).json();
+    const thread = (await app.inject({ method: 'GET', url: trainingChat, headers: as(p) })).json();
+    expect(thread.canModerate).toBe(false);
+    expect(thread.messages).toHaveLength(2);
+    const match = (await app.inject({ method: 'GET', url: matchChat, headers: as(p) })).json();
+    expect(match.messages.some((m: { body: string }) => m.body === 'Running 5 minutes late')).toBe(false);
+
+    const del = (id: string, who: AuthSession) => app.inject({ method: 'DELETE', url: `/api/v1/chat/messages/${id}`, headers: as(who) });
+    expect((await del(fromParent.id, p)).statusCode).toBe(403);
+    expect((await del(fromParent.id, parent)).statusCode).toBe(204);
+    expect((await del(fromPlayer.id, coach)).statusCode).toBe(204);
+    expect((await app.inject({ method: 'GET', url: trainingChat, headers: as(p) })).json().messages).toHaveLength(0);
   });
 });

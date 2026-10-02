@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Me } from '@hockey/contracts';
 import { AuthProvider, managedTeams, playingTeams, useAuth } from './core/auth';
 import { ToastProvider } from './core/Toast';
@@ -6,7 +6,10 @@ import { SignIn } from './screens/auth/SignIn';
 import { Verify } from './screens/auth/Verify';
 import { MyMatches } from './screens/availability/MyMatches';
 import { Announcements } from './screens/announcements/Announcements';
-import { Calendar } from './screens/calendar/Calendar';
+import { Calendar, followedTeams } from './screens/calendar/Calendar';
+import { Chats } from './screens/chat/Chats';
+import { BottomNav } from './core/BottomNav';
+import { api } from './api-client';
 import { Family } from './screens/family/Family';
 import { Fixtures } from './screens/fixtures/Fixtures';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
@@ -51,7 +54,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'matchday' | 'stats' | 'training' | 'membership' | 'account';
+export type Tab = 'chats' | 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'matchday' | 'stats' | 'training' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -62,10 +65,29 @@ function Shell({ me }: { me: Me }) {
   const [tab, setTab] = useState<Tab>(
     returningFromPayment ? 'membership' : canManage ? 'lineup' : me.children.length > 0 && !plays ? 'family' : 'matches',
   );
+  const follows = followedTeams(me).length > 0;
+
+  // Unread chat messages across every team you follow, for the Chats badge.
+  const [unread, setUnread] = useState(0);
+  const refreshUnread = useCallback(async () => {
+    const lists = await Promise.all(followedTeams(me).map((t) => api.getChatUnread(t.id).catch(() => [])));
+    setUnread(lists.flat().reduce((sum, u) => sum + u.unread, 0));
+  }, [me]);
+  useEffect(() => {
+    refreshUnread();
+    const timer = setInterval(() => document.visibilityState === 'visible' && refreshUnread(), 30000);
+    return () => clearInterval(timer);
+  }, [refreshUnread]);
+  const go = (next: Tab) => {
+    setTab(next);
+    window.scrollTo({ top: 0 });
+    refreshUnread();
+  };
   const tabs: { id: Tab; label: string }[] = [
     ...(me.children.length > 0 ? [{ id: 'family' as const, label: 'My children' }] : []),
     ...(me.teams.length > 0 ? [{ id: 'announcements' as const, label: 'Announcements' }] : []),
-    ...(me.teams.length > 0 ? [{ id: 'calendar' as const, label: 'Calendar' }] : []),
+    ...(follows ? [{ id: 'calendar' as const, label: 'Calendar' }] : []),
+    ...(follows ? [{ id: 'chats' as const, label: 'Chats' }] : []),
     ...(plays ? [{ id: 'matches' as const, label: 'My matches' }] : []),
     ...(canManage ? [{ id: 'lineup' as const, label: 'Lineup planner' }] : []),
     ...(canManage ? [{ id: 'fixtures' as const, label: 'Fixtures' }] : []),
@@ -103,12 +125,30 @@ function Shell({ me }: { me: Me }) {
               type="button"
               className={t.id === tab ? 'is-active' : undefined}
               aria-current={t.id === tab ? 'page' : undefined}
-              onClick={() => setTab(t.id)}
+              onClick={() => go(t.id)}
             >
               {t.label}
+              {t.id === 'chats' && unread > 0 && <span className="tabs__badge">{unread > 99 ? '99+' : unread}</span>}
             </button>
           ))}
         </nav>
+      )}
+
+      {tabs.length > 1 && (
+        <BottomNav
+          tabs={tabs}
+          primary={
+            canManage
+              ? ['calendar', 'chats', 'lineup', 'squad']
+              : plays
+                ? ['calendar', 'chats', 'matches', 'training']
+                : ['family', 'calendar', 'chats', 'membership']
+          }
+          current={tab}
+          badges={{ chats: unread }}
+          onSelect={go}
+          onSignOut={signOut}
+        />
       )}
 
       {tab === 'lineup' && canManage && <LineupPlanner me={me} />}
@@ -120,6 +160,7 @@ function Shell({ me }: { me: Me }) {
       {tab === 'family' && <Family me={me} />}
       {tab === 'announcements' && <Announcements me={me} />}
       {tab === 'calendar' && <Calendar me={me} />}
+      {tab === 'chats' && <Chats me={me} onUnreadChange={refreshUnread} />}
       {tab === 'matches' && <MyMatches me={me} />}
       {tab === 'membership' && <Membership me={me} />}
       {tab === 'account' && <Account me={me} />}

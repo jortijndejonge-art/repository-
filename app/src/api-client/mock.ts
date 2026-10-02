@@ -1,6 +1,6 @@
-import type { Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { ChatMessage, EventKind, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
-import { benchNow, pitchAt, secondsPlayed, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
+import { benchNow, pitchAt, secondsPlayed, minutesFromPlan, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
 import { ApiError, type ApiClient } from './types';
 
@@ -11,6 +11,9 @@ import { ApiError, type ApiClient } from './types';
 export function createMockClient(): ApiClient {
   const availability = demo.seedAvailability();
   const lineups = new Map<Id, Lineup>();
+  /** Demo chats, keyed 'match:<id>' / 'training:<id>'; reset on reload. */
+  const chats = new Map<string, ChatMessage[]>();
+  const chatReads = new Map<string, string>();
   const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
   const announcements: Announcement[] = [];
   const briefings = new Map<Id, Briefing>();
@@ -58,6 +61,23 @@ export function createMockClient(): ApiClient {
     const memberships = demo.memberships.filter((m) => m.memberId === id);
     const teams = demo.teams.filter((t) => memberships.some((m) => m.teamId === t.id));
     return { member, club: demo.club, memberships, teams, children: [] };
+  }
+
+  function addChat(kind: EventKind, eventId: Id, body: string, lineup?: LineupCard): ChatMessage {
+    const author = demo.members.find((m) => m.id === memberId);
+    const manager = demo.memberships.some((m) => m.memberId === memberId && m.roles.includes('manager'));
+    const msg: ChatMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      authorId: memberId,
+      authorName: author ? `${author.firstName} ${author.lastName}` : 'Someone',
+      authorRole: manager ? 'Manager' : 'Player',
+      body,
+      ...(lineup ? { lineup } : {}),
+      createdAt: new Date().toISOString(),
+    };
+    const key = `${kind}:${eventId}`;
+    chats.set(key, [...(chats.get(key) ?? []), msg]);
+    return msg;
   }
 
   return {
@@ -426,6 +446,58 @@ export function createMockClient(): ApiClient {
       };
       lineups.set(fixtureId, saved);
       return delay(saved);
+    },
+    async getEventChat(kind, eventId) {
+      const key = `${kind}:${eventId}`;
+      chatReads.set(`${key}|${memberId}`, new Date().toISOString());
+      const canModerate = demo.memberships.some((m) => m.memberId === memberId && m.roles.includes('manager'));
+      return delay({ messages: [...(chats.get(key) ?? [])], canModerate });
+    },
+    async postEventMessage(kind, eventId, body) {
+      if (!body.trim()) throw new ApiError(400, 'Write a message first');
+      return delay(addChat(kind, eventId, body.trim()));
+    },
+    async postLineupToChat(fixtureId, note = '') {
+      const lineup = lineups.get(fixtureId);
+      if (!lineup) throw new ApiError(409, 'Save the lineup before posting it');
+      const f = fixture(fixtureId);
+      const named = new Set([...lineup.starting.map((s) => s.memberId), ...lineup.bench]);
+      const formation = resolveFormation(f.teamId, lineup.formationId);
+      const card: LineupCard = {
+        teamName: demo.teams.find((t) => t.id === f.teamId)?.name ?? '',
+        opponent: f.opponent,
+        startsAt: f.startsAt,
+        format: f.format,
+        durationMinutes: f.durationMinutes,
+        formation,
+        positions: layouts.get(f.teamId)?.get(formation.id)?.positions,
+        starting: lineup.starting,
+        bench: lineup.bench,
+        substitutions: lineup.substitutions,
+        players: (demo.squads[f.teamId] ?? [])
+          .filter((p) => named.has(p.memberId))
+          .map((p) => ({ memberId: p.memberId, displayName: p.displayName, shirtNumber: p.shirtNumber })),
+        minutes: minutesFromPlan(lineup.starting, lineup.substitutions, f.durationMinutes),
+      };
+      return delay(addChat('match', fixtureId, note.trim(), card));
+    },
+    async deleteChatMessage(messageId) {
+      for (const [key, list] of chats) chats.set(key, list.filter((m) => m.id !== messageId));
+    },
+    async getChatUnread(teamId) {
+      const ids = new Set([
+        ...fixtures.filter((f) => f.teamId === teamId).map((f) => `match:${f.id}`),
+        ...trainingSessions.filter((t) => t.teamId === teamId).map((t) => `training:${t.id}`),
+      ]);
+      return delay(
+        [...chats]
+          .filter(([key]) => ids.has(key))
+          .map(([key, list]) => {
+            const [kind, eventId] = key.split(':') as [EventKind, Id];
+            const seen = chatReads.get(`${key}|${memberId}`) ?? '';
+            return { kind, eventId, total: list.length, unread: list.filter((m) => m.createdAt > seen && m.authorId !== memberId).length };
+          }),
+      );
     },
     async shareLineup(fixtureId, memberIds) {
       const lineup = lineups.get(fixtureId);

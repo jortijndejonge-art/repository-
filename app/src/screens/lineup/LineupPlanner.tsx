@@ -364,6 +364,20 @@ export function LineupPlanner({ me }: { me: Me }) {
     }
   };
 
+  /** Save, then post the lineup into the match chat as a card. */
+  const postToChat = async (note: string) => {
+    const d = draft();
+    if (!fixture || !d) return;
+    try {
+      await api.saveLineup(fixture.id, d);
+      await api.postLineupToChat(fixture.id, note);
+      setShareOpen(false);
+      toast('Lineup posted in the match chat');
+    } catch (err) {
+      toast(`Couldn't post: ${(err as Error).message}`);
+    }
+  };
+
   const share = async (memberIds: Id[]) => {
     const d = draft();
     if (!fixture || !d) return;
@@ -618,6 +632,7 @@ export function LineupPlanner({ me }: { me: Me }) {
           players={available}
           onCancel={() => setShareOpen(false)}
           onShare={share}
+          onPostToChat={postToChat}
           summary={shareText(fixture, team, formation, assignments, bench, byId)}
         />
       )}

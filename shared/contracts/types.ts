@@ -416,3 +416,54 @@ export interface MembershipRecord {
   status: 'active' | 'overdue' | 'cancelled';
   nextPaymentDue?: IsoDateTime;
 }
+
+// ---------------------------------------------------------------------------
+// Event chat: a group chat on each match and training session
+// ---------------------------------------------------------------------------
+
+export type EventKind = 'match' | 'training';
+
+/** A lineup posted into a match chat: a snapshot of what the manager saved then. */
+export interface LineupCard {
+  teamName: string;
+  opponent: string;
+  startsAt: IsoDateTime;
+  format: SquadFormat;
+  durationMinutes: number;
+  formation: Formation;
+  /** The team's own placement of this formation, if they dragged players into place. */
+  positions?: Record<string, PitchPosition>;
+  starting: SlotAssignment[];
+  bench: Id[];
+  substitutions: Substitution[];
+  /** The players in this lineup: names and numbers only. */
+  players: { memberId: Id; displayName: string; shirtNumber?: number }[];
+  /** Planned minutes per player. */
+  minutes: Record<Id, number>;
+}
+
+export interface ChatMessage {
+  id: Id;
+  authorId: Id | null;
+  /** e.g. "Alex Coach", "Sam Green" */
+  authorName: string;
+  /** e.g. "Manager", "Player", "Parent of Quinn G." */
+  authorRole: string;
+  body: string;
+  lineup?: LineupCard;
+  createdAt: IsoDateTime;
+}
+
+export interface ChatThread {
+  messages: ChatMessage[];
+  /** Managers may remove anyone's message; everyone may remove their own. */
+  canModerate: boolean;
+}
+
+export interface ChatUnread {
+  kind: EventKind;
+  eventId: Id;
+  unread: number;
+  total: number;
+}
+

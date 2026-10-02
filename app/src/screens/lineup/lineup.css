@@ -550,6 +550,36 @@
 }
 
 /* Share dialog */
+.share-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.share-chat h3,
+.share-notify__title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.share-chat p {
+  margin: 0;
+}
+
+.share-chat__note {
+  width: 100%;
+  resize: vertical;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+}
+
 .share-list {
   list-style: none;
   margin: 0;
