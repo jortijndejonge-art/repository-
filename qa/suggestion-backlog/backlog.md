@@ -8,6 +8,12 @@ marks something `Approved`; nothing in this file authorizes work by itself.
 Rejected items are kept for the record, not deleted — just move them to the
 "Rejected" state below rather than removing the entry.
 
+## Owner constraints
+
+- **Pitch screen is frozen (owner, 2026-10-02):** the pitch / lineup screen as it looks now
+  (half pitch, zone bands, tokens, goal, halfway line) must not be changed. Do not propose or
+  build visual or layout changes to it. Bug fixes the owner asks for are fine.
+
 ## Statuses
 
 - `Proposed` — newly logged, not yet reviewed
