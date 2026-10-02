@@ -4,6 +4,7 @@ import type {
   Id,
   Lineup,
   NewCustomFormation,
+  NewMembershipPlan,
   NewPlayer,
   PitchPosition,
   PlayerProfileUpdate,
@@ -18,15 +19,22 @@ import { AuthService } from './services/auth';
 import { badRequest, forbidden, HttpError, notFound, unauthorized } from './services/errors';
 import { LineupService } from './services/lineups';
 import type { Mailer } from './services/mailer';
+import { DisabledProvider, PaymentService, type PaymentProvider } from './services/payments';
 
 export interface AppDeps {
   repo: Repository;
   mailer: Mailer;
   config: Config;
+  /** Payment processor; payments are switched off when omitted. */
+  payments?: PaymentProvider;
   logger?: boolean;
 }
 
 declare module 'fastify' {
+  interface FastifyInstance {
+    /** Email members whose membership payment is due soon; returns how many were emailed. */
+    sendPaymentReminders(): Promise<number>;
+  }
   interface FastifyRequest {
     memberId?: Id;
     accessToken?: string;
@@ -53,11 +61,12 @@ const substitution = {
 } as const;
 const strategy = { enum: ['fair', 'strongest', 'stamina'] } as const;
 
-export function buildApp({ repo, mailer, config, logger = false }: AppDeps): FastifyInstance {
+export function buildApp({ repo, mailer, config, payments = new DisabledProvider(), logger = false }: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
   const auth = new AuthService(repo, mailer, config);
   const access = new Access(repo);
   const lineups = new LineupService(repo, mailer, config.appUrl);
+  const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof HttpError) return reply.code(err.statusCode).send({ error: err.message });
@@ -408,16 +417,61 @@ export function buildApp({ repo, mailer, config, logger = false }: AppDeps): Fas
         },
       );
 
-      // ---- Memberships (read-only for now; Stripe arrives in Phase 2) -------------
+      // ---- Memberships & payments (Stripe) ---------------------------------------
       api.get<{ Params: { clubId: Id } }>('/clubs/:clubId/membership-plans', async (req) => {
         await access.requireClubMember(await signedIn(req), req.params.clubId);
         return repo.listMembershipPlans(req.params.clubId);
       });
 
+      api.post<{ Params: { clubId: Id }; Body: NewMembershipPlan }>(
+        '/clubs/:clubId/membership-plans',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['name', 'amountPence', 'interval'],
+              additionalProperties: false,
+              properties: {
+                name: { type: 'string', minLength: 1, maxLength: 80 },
+                amountPence: { type: 'integer', minimum: 1, maximum: 10_000_000 },
+                interval: { enum: ['month', 'quarter', 'year'] },
+              },
+            },
+          },
+        },
+        async (req, reply) => {
+          await access.requireClubAdmin(await signedIn(req), req.params.clubId);
+          reply.code(201);
+          return repo.addMembershipPlan(req.params.clubId, req.body);
+        },
+      );
+
       api.get('/me/memberships', async (req) => repo.listMemberMemberships(await signedIn(req)));
+
+      api.get('/payments/config', async (req) => {
+        await signedIn(req);
+        return paymentService.config();
+      });
+
+      api.post<{ Params: { planId: Id } }>('/membership-plans/:planId/checkout', async (req) =>
+        paymentService.checkout(await signedIn(req), req.params.planId),
+      );
+
+      // Stripe signs the exact bytes it sends, so this route keeps the raw body for verification.
+      api.register(async (hook) => {
+        hook.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => done(null, body));
+        hook.post<{ Body: string }>('/webhooks/stripe', async (req) => {
+          const signature = req.headers['stripe-signature'];
+          const event = payments.verifyWebhook(req.body, Array.isArray(signature) ? signature[0] : signature);
+          await paymentService.handleEvent(event);
+          return { received: true };
+        });
+      });
     },
     { prefix: '/api/v1' },
   );
+
+  app.decorate('sendPaymentReminders', () => paymentService.sendDueReminders());
 
   return app;
 }

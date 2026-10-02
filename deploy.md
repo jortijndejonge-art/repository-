@@ -160,6 +160,30 @@ Real accounts and saved data need the backend (Node.js + PostgreSQL) running on 
 **variable** `VITE_API` to `http` (Settings → Secrets and variables → Actions → Variables) and the
 site switches to real sign-in on the next deploy.
 
+## Switching on Stripe payments (later)
+
+Membership payments are built and tested, and stay **off** until a Stripe account is connected.
+Until then the Membership tab says "Online payments aren't switched on yet", and the demo site
+simulates payments. When you have a Stripe account:
+
+1. In the Stripe dashboard (start in **test mode**), copy the secret key (`sk_test_…`).
+2. Developers → Webhooks → add an endpoint `https://www.solarbytez.co.uk/myhockey/api/v1/webhooks/stripe`
+   listening for `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed` and
+   `customer.subscription.deleted`. Copy its signing secret (`whsec_…`).
+3. Set these on the server where the backend runs (the backend has to be hosted first, see
+   "What goes live"): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `APP_URL` (the public address
+   of the app, e.g. `https://www.solarbytez.co.uk/myhockey`, used for the return links and reminder
+   emails). Restart the backend.
+4. Test with Stripe's test card `4242 4242 4242 4242`, then swap in the live keys.
+
+How it works: a member picks a plan and is sent to Stripe Checkout (a recurring subscription in GBP,
+monthly, every 3 months or yearly). Stripe then calls the webhook, which records the payment and
+sets the membership's status and next due date. Members are emailed a reminder when a payment is due
+within a week or overdue (checked every six hours, at most one email per six days).
+
+Not built yet: taking the platform's small transaction fee. That needs Stripe Connect, so each
+club has its own connected Stripe account. It is a separate step once you have a Stripe account.
+
 ## Troubleshooting
 
 | Symptom | Fix |

@@ -6,6 +6,7 @@ import { SignIn } from './screens/auth/SignIn';
 import { Verify } from './screens/auth/Verify';
 import { MyMatches } from './screens/availability/MyMatches';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
+import { Membership } from './screens/membership/Membership';
 import { Squad } from './screens/squad/Squad';
 import './core/shell.css';
 
@@ -42,17 +43,20 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'matches' | 'lineup' | 'squad';
+type Tab = 'matches' | 'lineup' | 'squad' | 'membership';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
   const canManage = managedTeams(me).length > 0;
   const plays = playingTeams(me).length > 0;
-  const [tab, setTab] = useState<Tab>(canManage ? 'lineup' : 'matches');
+  // Coming back from the payment page lands on the Membership tab.
+  const returningFromPayment = new URLSearchParams(location.search).has('payment');
+  const [tab, setTab] = useState<Tab>(returningFromPayment ? 'membership' : canManage ? 'lineup' : 'matches');
   const tabs: { id: Tab; label: string }[] = [
     ...(plays ? [{ id: 'matches' as const, label: 'My matches' }] : []),
     ...(canManage ? [{ id: 'lineup' as const, label: 'Lineup planner' }] : []),
     ...(canManage ? [{ id: 'squad' as const, label: 'Squad' }] : []),
+    { id: 'membership' as const, label: 'Membership' },
   ];
 
   return (
@@ -92,7 +96,8 @@ function Shell({ me }: { me: Me }) {
       {tab === 'lineup' && canManage && <LineupPlanner me={me} />}
       {tab === 'squad' && canManage && <Squad me={me} />}
       {tab === 'matches' && <MyMatches me={me} />}
-      {tabs.length === 0 && <p className="muted">You're not in any teams yet — ask your club to add you.</p>}
+      {tab === 'membership' && <Membership me={me} />}
+      {!plays && !canManage && <p className="muted">You're not in any teams yet — ask your club to add you.</p>}
     </div>
   );
 }

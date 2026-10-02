@@ -2,12 +2,17 @@ import type {
   Availability,
   AvailabilityStatus,
   AuthSession,
+  CheckoutSession,
   Fixture,
   Formation,
   FormationLayout,
   Id,
   Lineup,
   Me,
+  MembershipPlan,
+  MembershipRecord,
+  NewMembershipPlan,
+  PaymentsConfig,
   NewCustomFormation,
   NewPlayer,
   PlayerProfile,
@@ -34,6 +39,12 @@ export interface ApiClient {
   getSquad(teamId: Id): Promise<PlayerProfile[]>;
   addPlayer(teamId: Id, player: NewPlayer): Promise<PlayerProfile>;
   updatePlayer(teamId: Id, memberId: Id, update: PlayerProfileUpdate): Promise<PlayerProfile>;
+  getPaymentsConfig(): Promise<PaymentsConfig>;
+  getMembershipPlans(clubId: Id): Promise<MembershipPlan[]>;
+  createMembershipPlan(clubId: Id, plan: NewMembershipPlan): Promise<MembershipPlan>;
+  getMyMemberships(): Promise<MembershipRecord[]>;
+  /** Real mode returns a Stripe page to send the member to; demo mode simulates the payment. */
+  startCheckout(planId: Id): Promise<CheckoutSession>;
   getFixtures(teamId: Id, from?: string): Promise<Fixture[]>;
   getAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus): Promise<Availability>;

@@ -93,8 +93,51 @@ paths:
         '202': { description: Invite sent }
         '403': { description: Not a manager of this member }
 
+  /payments/config:
+    get:
+      summary: Whether online payments are switched on
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentsConfig' }
+
+  /membership-plans/{planId}/checkout:
+    parameters: [{ name: planId, in: path, required: true, schema: { type: string } }]
+    post:
+      summary: Start a Stripe Checkout for a membership plan; returns the page to send the member to
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutSession' }
+        '503': { description: Payments are not set up yet }
+
+  /webhooks/stripe:
+    post:
+      summary: Stripe webhook (signature-verified; records payments and updates memberships)
+      responses:
+        '200': { description: Event handled or ignored }
+        '400': { description: Bad signature }
+        '503': { description: Payments are not set up yet }
+
   /clubs/{clubId}/membership-plans:
     parameters: [{ $ref: '#/components/parameters/clubId' }]
+    post:
+      summary: Add a membership plan (club admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewMembershipPlan' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MembershipPlan' }
     get:
       summary: Membership plans offered by the club
       responses:
@@ -572,6 +615,26 @@ components:
         name: { type: string }
         amountPence: { type: integer }
         interval: { type: string, enum: [month, quarter, year] }
+
+    NewMembershipPlan:
+      type: object
+      required: [name, amountPence, interval]
+      properties:
+        name: { type: string }
+        amountPence: { type: integer, minimum: 1 }
+        interval: { type: string, enum: [month, quarter, year] }
+
+    PaymentsConfig:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+
+    CheckoutSession:
+      type: object
+      properties:
+        url: { type: string }
+        demo: { type: boolean }
 
     MembershipRecord:
       type: object

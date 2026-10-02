@@ -246,6 +246,24 @@ export interface MembershipPlan {
   interval: BillingInterval;
 }
 
+/** A club admin adding a membership plan. */
+export interface NewMembershipPlan {
+  name: string;
+  amountPence: number;
+  interval: BillingInterval;
+}
+
+/** Whether online payments are switched on (a Stripe account is connected). */
+export interface PaymentsConfig {
+  enabled: boolean;
+}
+
+/** Where to send the member to pay. Demo mode has no URL: the payment is simulated. */
+export interface CheckoutSession {
+  url?: string;
+  demo?: boolean;
+}
+
 export interface MembershipRecord {
   memberId: Id;
   planId: Id;

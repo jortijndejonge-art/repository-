@@ -1,0 +1,81 @@
+.membership {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.membership__heading {
+  margin: 8px 0 0;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.membership__notice {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--teal);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.membership__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.membership__card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.membership__status {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.membership__status--active {
+  color: var(--teal);
+}
+
+.membership__status--overdue {
+  color: #f0b429;
+}
+
+.membership__status--cancelled {
+  color: var(--text-muted);
+}
+
+.membership__form {
+  display: grid;
+  grid-template-columns: 1fr 120px 140px auto;
+  gap: 10px;
+  align-items: end;
+}
+
+@media (max-width: 520px) {
+  .membership__form {
+    grid-template-columns: 1fr 1fr;
+  }
+}

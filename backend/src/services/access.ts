@@ -42,6 +42,14 @@ export class Access {
     if (member?.clubId !== clubId) throw forbidden('You are not in this club');
   }
 
+  /** Club admins only: someone with the admin role on any team in this club. */
+  async requireClubAdmin(memberId: Id, clubId: Id) {
+    const [member, memberships] = await Promise.all([this.repo.getMember(memberId), this.repo.listMemberships(memberId)]);
+    if (member?.clubId !== clubId || !memberships.some((m) => m.roles.includes('admin'))) {
+      throw forbidden('Only a club admin can do this');
+    }
+  }
+
   /** A member can manage their own record; managers of any of their teams can too. */
   async requireCanActFor(actorId: Id, memberId: Id, teamId: Id) {
     if (actorId === memberId) return;

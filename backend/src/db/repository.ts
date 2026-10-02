@@ -10,6 +10,7 @@ import type {
   Lineup,
   Member,
   MembershipPlan,
+  NewMembershipPlan,
   MembershipRecord,
   NewPlayer,
   PlayerProfile,
@@ -20,6 +21,24 @@ import type {
 } from '@hockey/contracts';
 import type { Pool } from './pool';
 import type pg from 'pg';
+
+export interface PaymentInput {
+  memberId: Id;
+  planId: Id;
+  amountPence: number;
+  status: 'succeeded' | 'failed';
+  stripePaymentId: string;
+}
+
+export interface DueMembership {
+  memberId: Id;
+  planId: Id;
+  planName: string;
+  amountPence: number;
+  nextPaymentDue: string;
+  firstName: string;
+  email?: string;
+}
 
 /**
  * Typed data access (A7). The API layer depends only on this interface and
@@ -61,6 +80,17 @@ export interface Repository {
   // Memberships & payments
   listMembershipPlans(clubId: Id): Promise<MembershipPlan[]>;
   listMemberMemberships(memberId: Id): Promise<MembershipRecord[]>;
+  getMembershipPlan(planId: Id): Promise<MembershipPlan | null>;
+  addMembershipPlan(clubId: Id, plan: NewMembershipPlan): Promise<MembershipPlan>;
+  /** Creates or renews a membership: active, with the next payment due date. */
+  activateMembership(memberId: Id, planId: Id, nextPaymentDue: Date): Promise<void>;
+  /** Changes the status of an existing membership; does nothing if there isn't one. */
+  setMembershipStatus(memberId: Id, planId: Id, status: MembershipRecord['status']): Promise<void>;
+  /** Records a payment once per Stripe id; returns false if it was already recorded. */
+  recordPayment(payment: PaymentInput): Promise<boolean>;
+  /** Active or overdue memberships due before `dueBefore` and not reminded since `remindedBefore`. */
+  listDueMemberships(dueBefore: Date, remindedBefore: Date): Promise<DueMembership[]>;
+  markReminded(memberId: Id, planId: Id, at: Date): Promise<void>;
 
   // Auth
   createMagicLink(tokenHash: string, memberId: Id, expiresAt: Date): Promise<void>;
@@ -74,6 +104,14 @@ export interface Repository {
 type Row = Record<string, any>;
 
 const toClub = (r: Row): Club => ({ id: r.id, name: r.name });
+
+const toPlan = (r: Row): MembershipPlan => ({
+  id: r.id,
+  clubId: r.club_id,
+  name: r.name,
+  amountPence: r.amount_pence,
+  interval: r.interval,
+});
 
 const toTeam = (r: Row): Team => ({
   id: r.id,
@@ -403,13 +441,75 @@ export class PgRepository implements Repository {
   }
 
   listMembershipPlans(clubId: Id) {
-    return this.many('SELECT * FROM membership_plans WHERE club_id = $1 ORDER BY name', [clubId], (r) => ({
-      id: r.id,
-      clubId: r.club_id,
-      name: r.name,
-      amountPence: r.amount_pence,
-      interval: r.interval,
-    }));
+    return this.many('SELECT * FROM membership_plans WHERE club_id = $1 ORDER BY name', [clubId], toPlan);
+  }
+
+  getMembershipPlan(planId: Id) {
+    return this.one('SELECT * FROM membership_plans WHERE id = $1', [planId], toPlan);
+  }
+
+  async addMembershipPlan(clubId: Id, plan: NewMembershipPlan) {
+    const rows = await this.pool.query(
+      'INSERT INTO membership_plans (club_id, name, amount_pence, interval) VALUES ($1, $2, $3, $4) RETURNING *',
+      [clubId, plan.name, plan.amountPence, plan.interval],
+    );
+    return toPlan(rows.rows[0]);
+  }
+
+  async activateMembership(memberId: Id, planId: Id, nextPaymentDue: Date) {
+    await this.pool.query(
+      `INSERT INTO memberships (member_id, plan_id, status, next_payment_due) VALUES ($1, $2, 'active', $3)
+       ON CONFLICT (member_id, plan_id) DO UPDATE SET status = 'active', next_payment_due = $3, last_reminder_at = NULL`,
+      [memberId, planId, nextPaymentDue],
+    );
+  }
+
+  async setMembershipStatus(memberId: Id, planId: Id, status: MembershipRecord['status']) {
+    await this.pool.query('UPDATE memberships SET status = $3 WHERE member_id = $1 AND plan_id = $2', [
+      memberId,
+      planId,
+      status,
+    ]);
+  }
+
+  async recordPayment(p: PaymentInput) {
+    const res = await this.pool.query(
+      `INSERT INTO payments (member_id, plan_id, amount_pence, status, stripe_payment_id)
+       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (stripe_payment_id) DO NOTHING`,
+      [p.memberId, p.planId, p.amountPence, p.status, p.stripePaymentId],
+    );
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  listDueMemberships(dueBefore: Date, remindedBefore: Date) {
+    return this.many(
+      `SELECT ms.member_id, ms.plan_id, ms.next_payment_due, p.name AS plan_name, p.amount_pence,
+              m.first_name, m.email
+         FROM memberships ms
+         JOIN membership_plans p ON p.id = ms.plan_id
+         JOIN members m ON m.id = ms.member_id
+        WHERE ms.status IN ('active', 'overdue')
+          AND ms.next_payment_due IS NOT NULL AND ms.next_payment_due < $1
+          AND (ms.last_reminder_at IS NULL OR ms.last_reminder_at < $2)`,
+      [dueBefore, remindedBefore],
+      (r) => ({
+        memberId: r.member_id,
+        planId: r.plan_id,
+        planName: r.plan_name,
+        amountPence: r.amount_pence,
+        nextPaymentDue: new Date(r.next_payment_due).toISOString(),
+        firstName: r.first_name,
+        ...(r.email ? { email: r.email } : {}),
+      }),
+    );
+  }
+
+  async markReminded(memberId: Id, planId: Id, at: Date) {
+    await this.pool.query('UPDATE memberships SET last_reminder_at = $3 WHERE member_id = $1 AND plan_id = $2', [
+      memberId,
+      planId,
+      at,
+    ]);
   }
 
   listMemberMemberships(memberId: Id) {

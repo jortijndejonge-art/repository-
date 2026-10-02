@@ -43,6 +43,11 @@ export function useAuth() {
   return ctx;
 }
 
+/** Club admins can manage plans and every team in the club. */
+export function isClubAdmin(me: Me): boolean {
+  return me.memberships.some((m) => m.roles.includes('admin'));
+}
+
 /** Teams the member can manage: all club teams for admins, otherwise teams where they're manager. */
 export function managedTeams(me: Me): Team[] {
   const isAdmin = me.memberships.some((m) => m.roles.includes('admin'));

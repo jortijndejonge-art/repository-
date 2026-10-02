@@ -1,4 +1,4 @@
-import type { Availability, Formation, FormationLayout, Id, Lineup, Me, PlayerProfile } from '@hockey/contracts';
+import type { Availability, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -11,6 +11,8 @@ import { ApiError, type ApiClient } from './types';
 export function createMockClient(): ApiClient {
   const availability = demo.seedAvailability();
   const lineups = new Map<Id, Lineup>();
+  const plans: MembershipPlan[] = demo.membershipPlans.map((p) => ({ ...p }));
+  const myMemberships: MembershipRecord[] = [];
   const squads = new Map<Id, PlayerProfile[]>(
     Object.entries(demo.squads).map(([teamId, players]) => [teamId, players.map((p) => ({ ...p }))]),
   );
@@ -85,6 +87,31 @@ export function createMockClient(): ApiClient {
       if (!player) throw new ApiError(404, 'Player not in this team');
       Object.assign(player, update);
       return delay({ ...player });
+    },
+    async getPaymentsConfig() {
+      return delay({ enabled: true });
+    },
+    async getMembershipPlans() {
+      return delay(plans.map((p) => ({ ...p })));
+    },
+    async createMembershipPlan(clubId, plan) {
+      const created: MembershipPlan = { id: `plan-${Date.now().toString(36)}`, clubId, ...plan };
+      plans.push(created);
+      return delay({ ...created });
+    },
+    async getMyMemberships() {
+      return delay(myMemberships.map((r) => ({ ...r })));
+    },
+    async startCheckout(planId) {
+      const plan = plans.find((p) => p.id === planId);
+      if (!plan || !memberId) throw new ApiError(404, 'Membership plan not found');
+      const due = new Date();
+      due.setMonth(due.getMonth() + (plan.interval === 'month' ? 1 : plan.interval === 'quarter' ? 3 : 12));
+      const record: MembershipRecord = { memberId, planId, status: 'active', nextPaymentDue: due.toISOString() };
+      const at = myMemberships.findIndex((r) => r.planId === planId);
+      if (at >= 0) myMemberships[at] = record;
+      else myMemberships.push(record);
+      return delay({ demo: true });
     },
     async getFixtures(teamId, from) {
       return delay(demo.fixtures.filter((f) => f.teamId === teamId && (!from || f.startsAt >= from)));

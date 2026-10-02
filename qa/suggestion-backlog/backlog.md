@@ -34,9 +34,29 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0006**
+Next free id: **BL-0008**
 
 ---
+
+## BL-0007 — Squad screen: add and edit players
+- **Date:** 2026-10-02
+- **Source task:** B3 / C-layer gap (player profiles and squad management, Phase 1)
+- **Idea:** A Squad tab where managers add players and edit name, shirt number, positions (preferred first) and skill/stamina ratings.
+- **Rationale:** Master plan Phase 1 lists squad management and player profiles; the API existed but no screen did.
+- **Effort estimate:** S–M
+- **Owning agent:** C (screen and API client), reusing B's endpoints
+- **Status:** Approved — owner commissioned this directly.
+- **Outcome (2026-10-02):** Done, committed in 72b7056. Verified in the browser (add, edit, shows in the lineup planner). No change to the pitch screen.
+
+## BL-0006 — Membership payments with Stripe (built, switched off until Stripe keys are added)
+- **Date:** 2026-10-02
+- **Source task:** C5 (membership / payment UI), A5, Phase 2 membership management
+- **Idea:** Membership tab for every member (plans, your status, next payment, Join / Pay) and for admins a form to add plans. Backend: Stripe Checkout subscriptions (monthly, 3-monthly, yearly in GBP), a signature-verified webhook that records payments and updates membership status and next due date, and automatic payment-due reminder emails.
+- **Rationale:** The business plan earns on payment transaction fees; this is the payments foundation. The owner has no Stripe account yet, so it is built to stay off until keys are set.
+- **Effort estimate:** L
+- **Owning agent:** B (payments service, routes), A (repository, migration 004), C (Membership screen)
+- **Status:** Approved — owner commissioned this directly.
+- **Outcome (2026-10-02):** Done. Backend and screen built, with 16 payment tests (signature check, checkout request, webhook route, idempotent payments, reminders). Not run against real Stripe. Still to do once there is an account: set the keys (see deploy.md), and the platform's transaction fee, which needs Stripe Connect. Migration 004 must be applied on deploy.
 
 ## BL-0005 — Live drag preview: player follows the pointer, red when too close
 - **Date:** 2026-10-01

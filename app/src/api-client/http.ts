@@ -53,6 +53,11 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     addPlayer: (teamId, player) => request('POST', `/teams/${enc(teamId)}/players`, player),
     updatePlayer: (teamId, memberId, update) =>
       request('PATCH', `/teams/${enc(teamId)}/players/${enc(memberId)}`, update),
+    getPaymentsConfig: () => request('GET', '/payments/config'),
+    getMembershipPlans: (clubId) => request('GET', `/clubs/${enc(clubId)}/membership-plans`),
+    createMembershipPlan: (clubId, plan) => request('POST', `/clubs/${enc(clubId)}/membership-plans`, plan),
+    getMyMemberships: () => request('GET', '/me/memberships'),
+    startCheckout: (planId) => request('POST', `/membership-plans/${enc(planId)}/checkout`),
     getFixtures: (teamId, from) =>
       request('GET', `/teams/${enc(teamId)}/fixtures${from ? `?from=${enc(from)}` : ''}`),
     getAvailability: (fixtureId) => request('GET', `/fixtures/${enc(fixtureId)}/availability`),
