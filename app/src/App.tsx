@@ -6,6 +6,7 @@ import { SignIn } from './screens/auth/SignIn';
 import { Verify } from './screens/auth/Verify';
 import { MyMatches } from './screens/availability/MyMatches';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
+import { Account } from './screens/account/Account';
 import { Membership } from './screens/membership/Membership';
 import { Squad } from './screens/squad/Squad';
 import './core/shell.css';
@@ -43,7 +44,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'matches' | 'lineup' | 'squad' | 'membership';
+type Tab = 'matches' | 'lineup' | 'squad' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -57,6 +58,7 @@ function Shell({ me }: { me: Me }) {
     ...(canManage ? [{ id: 'lineup' as const, label: 'Lineup planner' }] : []),
     ...(canManage ? [{ id: 'squad' as const, label: 'Squad' }] : []),
     { id: 'membership' as const, label: 'Membership' },
+    { id: 'account' as const, label: 'Account' },
   ];
 
   return (
@@ -97,6 +99,7 @@ function Shell({ me }: { me: Me }) {
       {tab === 'squad' && canManage && <Squad me={me} />}
       {tab === 'matches' && <MyMatches me={me} />}
       {tab === 'membership' && <Membership me={me} />}
+      {tab === 'account' && <Account me={me} />}
       {!plays && !canManage && <p className="muted">You're not in any teams yet — ask your club to add you.</p>}
     </div>
   );

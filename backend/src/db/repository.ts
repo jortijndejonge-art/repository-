@@ -93,6 +93,8 @@ export interface Repository {
   markReminded(memberId: Id, planId: Id, at: Date): Promise<void>;
 
   // Auth
+  getPasswordHash(memberId: Id): Promise<string | null>;
+  setPasswordHash(memberId: Id, hash: string): Promise<void>;
   createMagicLink(tokenHash: string, memberId: Id, expiresAt: Date): Promise<void>;
   /** Marks the link used and returns its member, or null if unknown, used or expired. */
   consumeMagicLink(tokenHash: string): Promise<Id | null>;
@@ -537,6 +539,14 @@ export class PgRepository implements Repository {
       [tokenHash],
       (r) => r.member_id as Id,
     );
+  }
+
+  async getPasswordHash(memberId: Id) {
+    return (await this.one('SELECT password_hash FROM members WHERE id = $1', [memberId], (r) => r.password_hash as string | null)) ?? null;
+  }
+
+  async setPasswordHash(memberId: Id, hash: string) {
+    await this.pool.query('UPDATE members SET password_hash = $2 WHERE id = $1', [memberId, hash]);
   }
 
   async createSession(tokenHash: string, memberId: Id, expiresAt: Date) {

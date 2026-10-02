@@ -123,6 +123,43 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
         async (req) => auth.verify(req.body.token),
       );
 
+      api.post<{ Body: { email: string; password: string } }>(
+        '/auth/login',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['email', 'password'],
+              properties: {
+                email: { type: 'string', minLength: 3, maxLength: 320 },
+                password: { type: 'string', minLength: 1, maxLength: 200 },
+              },
+            },
+          },
+        },
+        async (req) => auth.loginWithPassword(req.body.email, req.body.password),
+      );
+
+      api.put<{ Body: { currentPassword?: string; newPassword: string } }>(
+        '/me/password',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['newPassword'],
+              properties: {
+                currentPassword: { type: 'string', maxLength: 200 },
+                newPassword: { type: 'string', maxLength: 200 },
+              },
+            },
+          },
+        },
+        async (req, reply) => {
+          await auth.setPassword(await signedIn(req), req.body.newPassword, req.body.currentPassword);
+          return reply.code(204).send();
+        },
+      );
+
       api.post('/auth/logout', async (req, reply) => {
         await signedIn(req);
         await auth.signOut(req.accessToken!);

@@ -7,6 +7,7 @@ interface AuthState {
   me: Me | null;
   loading: boolean;
   signIn: (token: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -29,12 +30,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMe(session.me);
   }, []);
 
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const session = await api.signInWithPassword(email, password);
+    setMe(session.me);
+  }, []);
+
   const signOut = useCallback(async () => {
     await api.signOut();
     setMe(null);
   }, []);
 
-  return <AuthContext.Provider value={{ me, loading, signIn, signOut }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ me, loading, signIn, signInWithPassword, signOut }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

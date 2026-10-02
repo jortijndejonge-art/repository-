@@ -3,12 +3,19 @@ import type { Config } from '../config';
 import type { Repository } from '../db/repository';
 import { hashToken, newToken } from '../auth/tokens';
 import type { Mailer } from './mailer';
-import { notFound, unauthorized } from './errors';
+import { generatePassword, hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '../auth/password';
+import { badRequest, HttpError, notFound, unauthorized } from './errors';
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 
+/** Password guesses allowed per email address before a short lockout. */
+const MAX_FAILED_LOGINS = 8;
+const LOCKOUT_MINUTES = 15;
+
 export class AuthService {
+  private readonly failedLogins = new Map<string, { count: number; until: number }>();
+
   constructor(
     private readonly repo: Repository,
     private readonly mailer: Mailer,
@@ -63,6 +70,52 @@ export class AuthService {
   async verify(token: string): Promise<AuthSession> {
     const memberId = await this.repo.consumeMagicLink(hashToken(token));
     if (!memberId) throw unauthorized('This link is invalid, expired or already used');
+    return this.startSession(memberId);
+  }
+
+  /** Sign in with an email and password. Wrong email and wrong password look the same. */
+  async loginWithPassword(email: string, password: string): Promise<AuthSession> {
+    const key = email.trim().toLowerCase();
+    const attempts = this.failedLogins.get(key);
+    if (attempts && attempts.count >= MAX_FAILED_LOGINS && attempts.until > Date.now()) {
+      throw new HttpError(429, `Too many attempts. Try again in ${LOCKOUT_MINUTES} minutes, or use an email link.`);
+    }
+    let memberId: Id | null = null;
+    const candidates = await this.repo.findMembersByEmail(key);
+    for (const member of candidates.length ? candidates : [null]) {
+      const hash = member ? await this.repo.getPasswordHash(member.id) : null;
+      if ((await verifyPassword(password, hash)) && member) memberId = member.id;
+    }
+    if (!memberId) {
+      const count = (attempts && attempts.until > Date.now() ? attempts.count : 0) + 1;
+      this.failedLogins.set(key, { count, until: Date.now() + LOCKOUT_MINUTES * MINUTE });
+      throw unauthorized('Wrong email or password');
+    }
+    this.failedLogins.delete(key);
+    return this.startSession(memberId);
+  }
+
+  /** Set or change your password. Changing an existing one needs the current password. */
+  async setPassword(memberId: Id, newPassword: string, currentPassword?: string): Promise<void> {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      throw badRequest(`Choose a password of at least ${MIN_PASSWORD_LENGTH} characters`);
+    }
+    const existing = await this.repo.getPasswordHash(memberId);
+    if (existing && !(await verifyPassword(currentPassword ?? '', existing))) {
+      throw unauthorized('Your current password is wrong');
+    }
+    await this.repo.setPasswordHash(memberId, await hashPassword(newPassword));
+  }
+
+  /** Used by the set-password command: returns the password that was set. */
+  async setPasswordForEmail(email: string, password = generatePassword()): Promise<string> {
+    const [member] = await this.repo.findMembersByEmail(email);
+    if (!member) throw notFound('No member with that email');
+    await this.repo.setPasswordHash(member.id, await hashPassword(password));
+    return password;
+  }
+
+  private async startSession(memberId: Id): Promise<AuthSession> {
     const accessToken = newToken();
     await this.repo.createSession(
       hashToken(accessToken),

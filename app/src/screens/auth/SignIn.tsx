@@ -8,8 +8,11 @@ import './auth.css';
 const demoPlayer = demo.members.find((m) => m.id === 'u12-p4')!;
 
 export function SignIn() {
-  const { signIn } = useAuth();
+  const { signIn, signInWithPassword } = useAuth();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [usePassword, setUsePassword] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [devLink, setDevLink] = useState<string | null>(null);
 
@@ -22,6 +25,18 @@ export function SignIn() {
       setState('sent');
     } catch {
       setState('error');
+    }
+  };
+
+  const submitPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setState('sending');
+    setLoginError(null);
+    try {
+      await signInWithPassword(email, password);
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Could not sign in');
+      setState('idle');
     }
   };
 
@@ -47,6 +62,42 @@ export function SignIn() {
               Use a different email
             </button>
           </>
+        ) : usePassword ? (
+          <form onSubmit={submitPassword} className="auth__form">
+            <label className="field">
+              <span className="field__label">Email</span>
+              <input
+                type="email"
+                required
+                autoComplete="username"
+                inputMode="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">Password</span>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+            <button type="submit" className="btn btn--primary" disabled={state === 'sending'}>
+              {state === 'sending' ? 'Signing in…' : 'Sign in'}
+            </button>
+            {loginError && (
+              <p className="status-bad" role="alert">
+                {loginError}
+              </p>
+            )}
+            <button type="button" className="btn btn--ghost" onClick={() => setUsePassword(false)}>
+              Email me a link instead
+            </button>
+          </form>
         ) : (
           <form onSubmit={submit} className="auth__form">
             <p className="muted">Enter the email your club has for you and we'll send you a one-tap sign-in link.</p>
@@ -66,6 +117,9 @@ export function SignIn() {
               {state === 'sending' ? 'Sending…' : 'Email me a link'}
             </button>
             {state === 'error' && <p className="status-bad">Couldn't send the link. Please try again.</p>}
+            <button type="button" className="btn btn--ghost" onClick={() => setUsePassword(true)}>
+              Sign in with a password instead
+            </button>
           </form>
         )}
 

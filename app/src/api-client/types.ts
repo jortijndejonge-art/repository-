@@ -33,6 +33,8 @@ export interface ApiClient {
 
   requestSignIn(email: string): Promise<{ devLink?: string }>;
   verifySignIn(token: string): Promise<AuthSession>;
+  signInWithPassword(email: string, password: string): Promise<AuthSession>;
+  changePassword(newPassword: string, currentPassword?: string): Promise<void>;
   signOut(): Promise<void>;
   me(): Promise<Me>;
 

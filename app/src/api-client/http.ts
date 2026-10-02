@@ -37,6 +37,14 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
       sessionStore.set(token);
       return session;
     },
+    async signInWithPassword(email, password) {
+      const session = await request<AuthSession>('POST', '/auth/login', { email, password });
+      token = session.accessToken;
+      sessionStore.set(token);
+      return session;
+    },
+    changePassword: (newPassword, currentPassword) =>
+      request('PUT', '/me/password', { newPassword, ...(currentPassword ? { currentPassword } : {}) }),
     async signOut() {
       try {
         if (token) await request('POST', '/auth/logout');

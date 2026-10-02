@@ -59,6 +59,47 @@ paths:
               schema: { $ref: '#/components/schemas/AuthSession' }
         '401': { description: Invalid, expired or already-used token }
 
+  /auth/login:
+    post:
+      summary: Sign in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthSession' }
+        '401': { description: Wrong email or password (the same answer for both) }
+        '429': { description: Too many wrong attempts; try again later }
+
+  /me/password:
+    put:
+      summary: Set or change your password (changing needs the current one)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 10 }
+      responses:
+        '204': { description: Password saved }
+        '400': { description: New password too short }
+        '401': { description: Current password is wrong }
+
   /auth/logout:
     post:
       summary: End the current session

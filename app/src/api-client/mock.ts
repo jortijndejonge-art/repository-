@@ -57,6 +57,15 @@ export function createMockClient(): ApiClient {
       sessionStore.set(`mock:${id}`);
       return delay({ accessToken: token, me });
     },
+    async signInWithPassword(email) {
+      // Demo mode only: any password works for a demo member.
+      const member = demo.members.find((m) => m.email?.toLowerCase() === email.trim().toLowerCase());
+      if (!member) throw new ApiError(401, 'Wrong email or password');
+      return this.verifySignIn(`mock:${member.id}`);
+    },
+    async changePassword() {
+      return delay(undefined);
+    },
     async signOut() {
       memberId = null;
       sessionStore.clear();
