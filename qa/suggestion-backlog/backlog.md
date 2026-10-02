@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0017**
+Next free id: **BL-0018**
 
 ---
+
+## BL-0017 — Editable substitution plan: quick select and drag and drop
+- **Date:** 2026-10-02
+- **Source task:** D4 (bench and planned substitutions); owner request with a screenshot of the plan
+- **Idea:** Each change in the Substitution plan card can be edited with menus (minute, position, player coming on), or by dragging: a player chip onto a change to bring them on, a change by its handle onto another to swap times, one change's player onto another's to swap them. Changes can be added and removed, the planned minutes update as you go, and "Reset to suggested plan" goes back. Saving the lineup saves the edited plan.
+- **Rationale:** Owner: "I want to be able to change the substitution plan use dragging and dropping and quick select."
+- **Effort estimate:** M
+- **Owning agent:** D (plan card), shared engine (plan consistency maths)
+- **Status:** Approved — owner commissioned this directly.
+- **Outcome (2026-10-02):** Done, committed in 410a0b4 and live. The pitch itself is untouched (only the side card changed). Changes depend on each other (a player can't come on before they have gone off), so the plan is replayed after every edit: menu choices that would break a later change are greyed out, a drag that would break one is refused with a message, and removing a change also removes later ones that relied on it, with a message saying so. The chip strip stays in view while scrolling, and dragging near the screen edge scrolls the page. 8 engine tests; every drag and menu path tried in a browser with a mouse, but not yet on a real touch screen. Edits last until the lineup is re-planned (moving players on the pitch, changing availability or pressing Suggest lineup).
 
 ## BL-0016 — Season stats: attendance, availability and minutes
 - **Date:** 2026-10-02
