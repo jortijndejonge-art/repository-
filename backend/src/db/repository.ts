@@ -3,6 +3,10 @@ import type {
   AvailabilityStatus,
   Club,
   Fixture,
+  TrainingResponse,
+  TrainingSession,
+  TrainingSessionUpdate,
+  NewTrainingSession,
   FixtureUpdate,
   NewFixture,
   Formation,
@@ -76,6 +80,16 @@ export interface Repository {
   deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
+
+  // Training
+  listTrainingSessions(teamId: Id, from?: string): Promise<TrainingSession[]>;
+  getTrainingSession(id: Id): Promise<TrainingSession | null>;
+  addTrainingSession(teamId: Id, session: NewTrainingSession): Promise<TrainingSession>;
+  updateTrainingSession(id: Id, update: TrainingSessionUpdate): Promise<TrainingSession | null>;
+  deleteTrainingSession(id: Id): Promise<boolean>;
+  listTrainingResponses(sessionId: Id): Promise<TrainingResponse[]>;
+  setTrainingRsvp(sessionId: Id, memberId: Id, status: 'available' | 'unavailable' | 'maybe' | 'no_response'): Promise<void>;
+  setTrainingAttendance(sessionId: Id, memberId: Id, attended: boolean): Promise<void>;
 
   // Lineups
   getLineup(fixtureId: Id): Promise<Lineup | null>;
@@ -161,6 +175,15 @@ const toFixture = (r: Row): Fixture => ({
   format: r.format as SquadFormat,
   durationMinutes: r.duration_minutes,
   periods: r.periods,
+});
+
+const toTraining = (r: Row): TrainingSession => ({
+  id: r.id,
+  teamId: r.team_id,
+  startsAt: r.starts_at,
+  durationMinutes: r.duration_minutes,
+  venue: r.venue,
+  ...(r.notes ? { notes: r.notes } : {}),
 });
 
 const toAvailability = (r: Row): Availability => ({
@@ -405,6 +428,73 @@ export class PgRepository implements Repository {
       toAvailability,
     );
     return row!;
+  }
+
+  listTrainingSessions(teamId: Id, from?: string) {
+    return this.many(
+      "SELECT * FROM training_sessions WHERE team_id = $1 AND starts_at >= COALESCE($2::timestamptz, '-infinity') ORDER BY starts_at",
+      [teamId, from ?? null],
+      toTraining,
+    );
+  }
+
+  getTrainingSession(id: Id) {
+    return this.one('SELECT * FROM training_sessions WHERE id = $1', [id], toTraining);
+  }
+
+  async addTrainingSession(teamId: Id, s: NewTrainingSession) {
+    const { rows } = await this.pool.query(
+      `INSERT INTO training_sessions (team_id, starts_at, duration_minutes, venue, notes)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [teamId, s.startsAt, s.durationMinutes, s.venue, s.notes ?? null],
+    );
+    return toTraining(rows[0]);
+  }
+
+  async updateTrainingSession(id: Id, u: TrainingSessionUpdate) {
+    const columns: Record<string, unknown> = {
+      starts_at: u.startsAt,
+      duration_minutes: u.durationMinutes,
+      venue: u.venue,
+      notes: u.notes,
+    };
+    const set = Object.entries(columns).filter(([, v]) => v !== undefined);
+    if (set.length === 0) return this.getTrainingSession(id);
+    return this.one(
+      `UPDATE training_sessions SET ${set.map(([k], i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`,
+      [id, ...set.map(([, v]) => v)],
+      toTraining,
+    );
+  }
+
+  async deleteTrainingSession(id: Id) {
+    const res = await this.pool.query('DELETE FROM training_sessions WHERE id = $1', [id]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  listTrainingResponses(sessionId: Id) {
+    return this.many('SELECT * FROM training_responses WHERE session_id = $1', [sessionId], (r) => ({
+      sessionId: r.session_id,
+      memberId: r.member_id,
+      rsvp: (r.rsvp ?? 'no_response') as AvailabilityStatus,
+      ...(r.attended != null ? { attended: r.attended as boolean } : {}),
+    }));
+  }
+
+  async setTrainingRsvp(sessionId: Id, memberId: Id, status: AvailabilityStatus) {
+    await this.pool.query(
+      `INSERT INTO training_responses (session_id, member_id, rsvp) VALUES ($1, $2, $3)
+       ON CONFLICT (session_id, member_id) DO UPDATE SET rsvp = EXCLUDED.rsvp`,
+      [sessionId, memberId, status === 'no_response' ? null : status],
+    );
+  }
+
+  async setTrainingAttendance(sessionId: Id, memberId: Id, attended: boolean) {
+    await this.pool.query(
+      `INSERT INTO training_responses (session_id, member_id, attended) VALUES ($1, $2, $3)
+       ON CONFLICT (session_id, member_id) DO UPDATE SET attended = EXCLUDED.attended`,
+      [sessionId, memberId, attended],
+    );
   }
 
   async getLineup(fixtureId: Id): Promise<Lineup | null> {

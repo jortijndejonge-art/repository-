@@ -16,11 +16,15 @@ import type {
   PaymentsConfig,
   NewCustomFormation,
   NewFixture,
+  NewTrainingSession,
   NewPlayer,
   PlayerProfile,
   PlayerProfileUpdate,
   SquadFormat,
   SuggestionRequest,
+  TrainingResponse,
+  TrainingSession,
+  TrainingSessionUpdate,
   SuggestionResult,
 } from '@hockey/contracts';
 
@@ -55,6 +59,13 @@ export interface ApiClient {
   addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
   updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
   deleteFixture(fixtureId: Id): Promise<void>;
+  getTrainingSessions(teamId: Id, from?: string): Promise<TrainingSession[]>;
+  addTrainingSession(teamId: Id, session: NewTrainingSession): Promise<TrainingSession>;
+  updateTrainingSession(sessionId: Id, update: TrainingSessionUpdate): Promise<TrainingSession>;
+  deleteTrainingSession(sessionId: Id): Promise<void>;
+  getTrainingResponses(sessionId: Id): Promise<TrainingResponse[]>;
+  setTrainingRsvp(sessionId: Id, memberId: Id, status: AvailabilityStatus): Promise<void>;
+  setTrainingAttendance(sessionId: Id, memberId: Id, attended: boolean): Promise<void>;
   getAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus): Promise<Availability>;
 

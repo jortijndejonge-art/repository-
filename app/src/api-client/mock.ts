@@ -1,4 +1,4 @@
-import type { Availability, Fixture, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -12,6 +12,8 @@ export function createMockClient(): ApiClient {
   const availability = demo.seedAvailability();
   const lineups = new Map<Id, Lineup>();
   const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
+  const trainingSessions: TrainingSession[] = [];
+  const trainingResponses = new Map<string, TrainingResponse>();
   const plans: MembershipPlan[] = demo.membershipPlans.map((p) => ({ ...p }));
   const myMemberships: MembershipRecord[] = [];
   const squads = new Map<Id, PlayerProfile[]>(
@@ -126,6 +128,50 @@ export function createMockClient(): ApiClient {
       if (at >= 0) myMemberships[at] = record;
       else myMemberships.push(record);
       return delay({ demo: true });
+    },
+    async getTrainingSessions(teamId, from) {
+      return delay(
+        trainingSessions
+          .filter((s) => s.teamId === teamId && (!from || s.startsAt >= from))
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+          .map((s) => ({ ...s })),
+      );
+    },
+    async addTrainingSession(teamId, input) {
+      const created: TrainingSession = { id: `tr-${Date.now().toString(36)}`, teamId, ...input };
+      trainingSessions.push(created);
+      return delay({ ...created });
+    },
+    async updateTrainingSession(id, update) {
+      const s = trainingSessions.find((x) => x.id === id);
+      if (!s) throw new ApiError(404, 'Training session not found');
+      Object.assign(s, update);
+      return delay({ ...s });
+    },
+    async deleteTrainingSession(id) {
+      const at = trainingSessions.findIndex((s) => s.id === id);
+      if (at < 0) throw new ApiError(404, 'Training session not found');
+      trainingSessions.splice(at, 1);
+      return delay(undefined);
+    },
+    async getTrainingResponses(sessionId) {
+      const s = trainingSessions.find((x) => x.id === sessionId);
+      if (!s) throw new ApiError(404, 'Training session not found');
+      return delay(
+        (squads.get(s.teamId) ?? []).map(
+          (p) => ({ ...(trainingResponses.get(`${sessionId}/${p.memberId}`) ?? { sessionId, memberId: p.memberId, rsvp: 'no_response' as const }) }),
+        ),
+      );
+    },
+    async setTrainingRsvp(sessionId, id, status) {
+      const key = `${sessionId}/${id}`;
+      trainingResponses.set(key, { ...(trainingResponses.get(key) ?? { sessionId, memberId: id }), rsvp: status });
+      return delay(undefined);
+    },
+    async setTrainingAttendance(sessionId, id, attended) {
+      const key = `${sessionId}/${id}`;
+      trainingResponses.set(key, { ...(trainingResponses.get(key) ?? { sessionId, memberId: id, rsvp: 'no_response' as const }), attended });
+      return delay(undefined);
     },
     async getFixtures(teamId, from) {
       return delay(

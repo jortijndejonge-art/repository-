@@ -1,0 +1,82 @@
+@import '../availability/my-matches.css';
+
+.training__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.training__item.is-past {
+  opacity: 0.6;
+}
+
+.training__head {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.training__item .fixtures__row:only-child {
+  border-radius: var(--radius);
+}
+
+.training__panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 10px 14px;
+}
+
+.training__panel p {
+  margin: 0 0 8px;
+}
+
+.training__players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+}
+
+.training__players li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.training__players label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.training__rsvp {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.training__rsvp--available {
+  color: var(--teal);
+}
+
+.training__rsvp--unavailable {
+  color: #ef6461;
+}
+
+.training__player {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media (max-width: 520px) {
+  .training__players {
+    grid-template-columns: 1fr;
+  }
+}

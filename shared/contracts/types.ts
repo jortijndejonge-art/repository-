@@ -115,6 +115,32 @@ export interface Fixture {
   periods: number;
 }
 
+// ---------------------------------------------------------------------------
+// Training sessions
+// ---------------------------------------------------------------------------
+
+export interface TrainingSession {
+  id: Id;
+  teamId: Id;
+  startsAt: IsoDateTime;
+  durationMinutes: number;
+  venue: string;
+  notes?: string;
+}
+
+export type NewTrainingSession = Omit<TrainingSession, 'id' | 'teamId'>;
+export type TrainingSessionUpdate = Partial<NewTrainingSession>;
+
+/** One squad member's answer for a session, and whether the manager marked them as attending. */
+export interface TrainingResponse {
+  sessionId: Id;
+  memberId: Id;
+  /** 'no_response' until they answer. */
+  rsvp: AvailabilityStatus;
+  /** Unset until the manager records attendance. */
+  attended?: boolean;
+}
+
 /** Adding a fixture to a team's calendar. */
 export type NewFixture = Omit<Fixture, 'id' | 'teamId'>;
 

@@ -6,6 +6,8 @@ import type {
   Lineup,
   NewCustomFormation,
   NewFixture,
+  NewTrainingSession,
+  TrainingSessionUpdate,
   NewMembershipPlan,
   NewPlayer,
   PitchPosition,
@@ -20,6 +22,7 @@ import { Access } from './services/access';
 import { AuthService } from './services/auth';
 import { badRequest, forbidden, HttpError, notFound, unauthorized } from './services/errors';
 import { LineupService } from './services/lineups';
+import { TrainingService } from './services/training';
 import type { Mailer } from './services/mailer';
 import { DisabledProvider, PaymentService, type PaymentProvider } from './services/payments';
 
@@ -70,6 +73,12 @@ const fixtureProps = {
   durationMinutes: { type: 'integer', minimum: 5, maximum: 240 },
   periods: { type: 'integer', minimum: 1, maximum: 8 },
 } as const;
+const trainingProps = {
+  startsAt: { type: 'string', format: 'date-time' },
+  durationMinutes: { type: 'integer', minimum: 5, maximum: 300 },
+  venue: { type: 'string', minLength: 1, maxLength: 160 },
+  notes: { type: 'string', maxLength: 1000 },
+} as const;
 const strategy = { enum: ['fair', 'strongest', 'stamina'] } as const;
 
 export function buildApp({ repo, mailer, config, payments = new DisabledProvider(), logger = false }: AppDeps): FastifyInstance {
@@ -77,6 +86,7 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
   const auth = new AuthService(repo, mailer, config);
   const access = new Access(repo);
   const lineups = new LineupService(repo, mailer, config.appUrl);
+  const training = new TrainingService(repo);
   const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
 
   app.setErrorHandler((err, _req, reply) => {
@@ -511,6 +521,99 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
           await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
           reply.code(202);
           return lineups.share(req.params.fixtureId, req.body?.memberIds);
+        },
+      );
+
+      // ---- Training sessions (Phase 2) ---------------------------------------------
+      api.get<{ Params: { teamId: Id }; Querystring: { from?: string } }>(
+        '/teams/:teamId/training',
+        { schema: { querystring: { type: 'object', properties: { from: { type: 'string', format: 'date-time' } } } } },
+        async (req) => {
+          await access.requireTeamMember(await signedIn(req), req.params.teamId);
+          return repo.listTrainingSessions(req.params.teamId, req.query.from);
+        },
+      );
+
+      api.post<{ Params: { teamId: Id }; Body: NewTrainingSession }>(
+        '/teams/:teamId/training',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['startsAt', 'durationMinutes', 'venue'],
+              additionalProperties: false,
+              properties: trainingProps,
+            },
+          },
+        },
+        async (req, reply) => {
+          await access.requireManager(await signedIn(req), req.params.teamId);
+          reply.code(201);
+          return repo.addTrainingSession(req.params.teamId, req.body);
+        },
+      );
+
+      api.patch<{ Params: { sessionId: Id }; Body: TrainingSessionUpdate }>(
+        '/training/:sessionId',
+        { schema: { body: { type: 'object', additionalProperties: false, properties: trainingProps } } },
+        async (req) => {
+          await access.requireManager(await signedIn(req), (await training.session(req.params.sessionId)).teamId);
+          return (await repo.updateTrainingSession(req.params.sessionId, req.body)) ?? Promise.reject(notFound());
+        },
+      );
+
+      api.delete<{ Params: { sessionId: Id } }>('/training/:sessionId', async (req, reply) => {
+        await access.requireManager(await signedIn(req), (await training.session(req.params.sessionId)).teamId);
+        await repo.deleteTrainingSession(req.params.sessionId);
+        return reply.code(204).send();
+      });
+
+      api.get<{ Params: { sessionId: Id } }>('/training/:sessionId/responses', async (req) => {
+        await access.requireTeamMember(await signedIn(req), (await training.session(req.params.sessionId)).teamId);
+        return training.responses(req.params.sessionId);
+      });
+
+      api.put<{ Params: { sessionId: Id }; Body: { memberId: Id; status: AvailabilityStatus } }>(
+        '/training/:sessionId/rsvp',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['memberId', 'status'],
+              properties: {
+                memberId: { type: 'string' },
+                status: { enum: ['available', 'unavailable', 'maybe', 'no_response'] },
+              },
+            },
+          },
+        },
+        async (req, reply) => {
+          const actor = await signedIn(req);
+          const { teamId } = await training.session(req.params.sessionId);
+          await access.requireCanActFor(actor, req.body.memberId, teamId);
+          await training.requireInSquad(teamId, req.body.memberId);
+          await repo.setTrainingRsvp(req.params.sessionId, req.body.memberId, req.body.status);
+          return reply.code(204).send();
+        },
+      );
+
+      api.put<{ Params: { sessionId: Id }; Body: { memberId: Id; attended: boolean } }>(
+        '/training/:sessionId/attendance',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['memberId', 'attended'],
+              properties: { memberId: { type: 'string' }, attended: { type: 'boolean' } },
+            },
+          },
+        },
+        async (req, reply) => {
+          const { teamId } = await training.session(req.params.sessionId);
+          await access.requireManager(await signedIn(req), teamId);
+          await training.requireInSquad(teamId, req.body.memberId);
+          await repo.setTrainingAttendance(req.params.sessionId, req.body.memberId, req.body.attended);
+          return reply.code(204).send();
         },
       );
 

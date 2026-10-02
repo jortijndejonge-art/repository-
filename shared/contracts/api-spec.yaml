@@ -297,6 +297,101 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Fixture' } }
 
+  /teams/{teamId}/training:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    get:
+      summary: Training sessions for a team, soonest first
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/TrainingSession' } }
+    post:
+      summary: Add a training session (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewTrainingSession' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrainingSession' }
+
+  /training/{sessionId}:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    patch:
+      summary: Edit a training session (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewTrainingSession' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrainingSession' }
+    delete:
+      summary: Delete a training session (manager/admin)
+      responses:
+        '204': { description: Deleted }
+
+  /training/{sessionId}/responses:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: The whole squad's RSVPs and recorded attendance
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/TrainingResponse' } }
+
+  /training/{sessionId}/rsvp:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    put:
+      summary: Answer for yourself (or, as a manager, for a player)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberId, status]
+              properties:
+                memberId: { type: string }
+                status: { type: string, enum: [available, unavailable, maybe, no_response] }
+      responses:
+        '204': { description: Saved }
+
+  /training/{sessionId}/attendance:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    put:
+      summary: Record whether a player attended (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberId, attended]
+              properties:
+                memberId: { type: string }
+                attended: { type: boolean }
+      responses:
+        '204': { description: Saved }
+
   /fixtures/{fixtureId}:
     parameters:
       - { name: fixtureId, in: path, required: true, schema: { type: string } }
@@ -568,6 +663,36 @@ components:
         format: { $ref: '#/components/schemas/SquadFormat' }
         durationMinutes: { type: integer }
         periods: { type: integer }
+
+    TrainingSession:
+      type: object
+      required: [id, teamId, startsAt, durationMinutes, venue]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer }
+        venue: { type: string }
+        notes: { type: string }
+
+    NewTrainingSession:
+      type: object
+      description: A TrainingSession without id and teamId. PATCH accepts any subset.
+      required: [startsAt, durationMinutes, venue]
+      properties:
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer }
+        venue: { type: string }
+        notes: { type: string }
+
+    TrainingResponse:
+      type: object
+      required: [sessionId, memberId, rsvp]
+      properties:
+        sessionId: { type: string }
+        memberId: { type: string }
+        rsvp: { type: string, enum: [available, unavailable, maybe, no_response] }
+        attended: { type: boolean }
 
     NewFixture:
       type: object

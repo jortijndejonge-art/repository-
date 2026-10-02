@@ -436,3 +436,56 @@ describe('fixtures', () => {
     expect(deniedDelete.statusCode).toBe(403);
   });
 });
+
+describe('training sessions', () => {
+  const session = { startsAt: '2030-05-06T17:30:00.000Z', durationMinutes: 60, venue: 'Test Astro', notes: 'Bring shin pads' };
+
+  it('lets a manager schedule, edit and delete a session', async () => {
+    const coach = await signIn('coach@example.com');
+    const add = await app.inject({ method: 'POST', url: '/api/v1/teams/u12/training', headers: as(coach), payload: session });
+    expect(add.statusCode).toBe(201);
+    const created = add.json();
+    expect(created).toMatchObject({ ...session, teamId: 'u12' });
+
+    const edit = await app.inject({ method: 'PATCH', url: `/api/v1/training/${created.id}`, headers: as(coach), payload: { venue: 'Main pitch' } });
+    expect(edit.json()).toMatchObject({ venue: 'Main pitch', durationMinutes: 60 });
+
+    const list = await app.inject({ method: 'GET', url: '/api/v1/teams/u12/training', headers: as(coach) });
+    expect(list.json().map((s: { id: string }) => s.id)).toContain(created.id);
+
+    expect((await app.inject({ method: 'DELETE', url: `/api/v1/training/${created.id}`, headers: as(coach) })).statusCode).toBe(204);
+  });
+
+  it('records RSVPs by the player and attendance by the manager', async () => {
+    const coach = await signIn('coach@example.com');
+    const p = await signIn(playerEmail);
+    const created = (await app.inject({ method: 'POST', url: '/api/v1/teams/u12/training', headers: as(coach), payload: session })).json();
+    const url = `/api/v1/training/${created.id}`;
+
+    const before = (await app.inject({ method: 'GET', url: `${url}/responses`, headers: as(coach) })).json();
+    expect(before).toHaveLength(u12Players.length);
+    expect(before.every((r: { rsvp: string }) => r.rsvp === 'no_response')).toBe(true);
+
+    const rsvp = await app.inject({ method: 'PUT', url: `${url}/rsvp`, headers: as(p), payload: { memberId: player.memberId, status: 'available' } });
+    expect(rsvp.statusCode).toBe(204);
+    const otherPlayer = await app.inject({ method: 'PUT', url: `${url}/rsvp`, headers: as(p), payload: { memberId: teammate.memberId, status: 'available' } });
+    expect(otherPlayer.statusCode).toBe(403);
+
+    const selfAttend = await app.inject({ method: 'PUT', url: `${url}/attendance`, headers: as(p), payload: { memberId: player.memberId, attended: true } });
+    expect(selfAttend.statusCode).toBe(403);
+    const attend = await app.inject({ method: 'PUT', url: `${url}/attendance`, headers: as(coach), payload: { memberId: player.memberId, attended: true } });
+    expect(attend.statusCode).toBe(204);
+
+    const after = (await app.inject({ method: 'GET', url: `${url}/responses`, headers: as(coach) })).json();
+    expect(after.find((r: { memberId: string }) => r.memberId === player.memberId)).toMatchObject({ rsvp: 'available', attended: true });
+
+    await app.inject({ method: 'DELETE', url, headers: as(coach) });
+  });
+
+  it('refuses sessions from players and bad input', async () => {
+    const p = await signIn(playerEmail);
+    expect((await app.inject({ method: 'POST', url: '/api/v1/teams/u12/training', headers: as(p), payload: session })).statusCode).toBe(403);
+    const coach = await signIn('coach@example.com');
+    expect((await app.inject({ method: 'POST', url: '/api/v1/teams/u12/training', headers: as(coach), payload: { ...session, durationMinutes: 0 } })).statusCode).toBe(400);
+  });
+});

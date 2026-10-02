@@ -73,6 +73,16 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     addFixture: (teamId, fixture) => request('POST', `/teams/${enc(teamId)}/fixtures`, fixture),
     updateFixture: (fixtureId, update) => request('PATCH', `/fixtures/${enc(fixtureId)}`, update),
     deleteFixture: (fixtureId) => request('DELETE', `/fixtures/${enc(fixtureId)}`),
+    getTrainingSessions: (teamId, from) =>
+      request('GET', `/teams/${enc(teamId)}/training${from ? `?from=${enc(from)}` : ''}`),
+    addTrainingSession: (teamId, session) => request('POST', `/teams/${enc(teamId)}/training`, session),
+    updateTrainingSession: (sessionId, update) => request('PATCH', `/training/${enc(sessionId)}`, update),
+    deleteTrainingSession: (sessionId) => request('DELETE', `/training/${enc(sessionId)}`),
+    getTrainingResponses: (sessionId) => request('GET', `/training/${enc(sessionId)}/responses`),
+    setTrainingRsvp: (sessionId, memberId, status) =>
+      request('PUT', `/training/${enc(sessionId)}/rsvp`, { memberId, status }),
+    setTrainingAttendance: (sessionId, memberId, attended) =>
+      request('PUT', `/training/${enc(sessionId)}/attendance`, { memberId, attended }),
     getAvailability: (fixtureId) => request('GET', `/fixtures/${enc(fixtureId)}/availability`),
     setAvailability: (fixtureId, memberId, status) =>
       request('PUT', `/fixtures/${enc(fixtureId)}/availability`, { memberId, status }),
