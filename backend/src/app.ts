@@ -17,6 +17,7 @@ import type {
   PlayerProfileUpdate,
   SquadFormat,
   SuggestionRequest,
+  EventKind,
 } from '@hockey/contracts';
 import { buildCustomFormationSlots, formationsFor, validateLineCounts, FORMATIONS } from '@hockey/engine';
 import type { Config } from './config';
@@ -26,6 +27,7 @@ import { AuthService } from './services/auth';
 import { badRequest, forbidden, HttpError, notFound, unauthorized } from './services/errors';
 import { BriefingService } from './services/briefings';
 import { LineupService } from './services/lineups';
+import { ChatService } from './services/chat';
 import { LiveService } from './services/live';
 import { TrainingService } from './services/training';
 import type { Mailer } from './services/mailer';
@@ -91,6 +93,7 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
   const auth = new AuthService(repo, mailer, config);
   const access = new Access(repo);
   const lineups = new LineupService(repo, mailer, config.appUrl);
+  const chat = new ChatService(repo, access, lineups);
   const training = new TrainingService(repo);
   const live = new LiveService(repo);
   const briefings = new BriefingService(repo);
@@ -327,7 +330,8 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
         '/teams/:teamId/fixtures',
         { schema: { querystring: { type: 'object', properties: { from: { type: 'string', format: 'date-time' } } } } },
         async (req) => {
-          await access.requireTeamMember(await signedIn(req), req.params.teamId);
+          // Parents too: they follow their child's schedule.
+          await access.requireTeamViewer(await signedIn(req), req.params.teamId);
           return repo.listTeamFixtures(req.params.teamId, req.query.from);
         },
       );
@@ -676,6 +680,49 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
         },
       );
 
+      // ---- Event chat: a group chat on each match and training session ---------------
+      const eventParams = {
+        type: 'object',
+        required: ['kind', 'eventId'],
+        properties: { kind: { enum: ['match', 'training'] }, eventId: { type: 'string' } },
+      } as const;
+
+      api.get<{ Params: { kind: EventKind; eventId: Id } }>('/events/:kind/:eventId/chat', { schema: { params: eventParams } }, async (req) =>
+        chat.thread(req.params.kind, req.params.eventId, await signedIn(req)),
+      );
+
+      api.post<{ Params: { kind: EventKind; eventId: Id }; Body: { body: string } }>(
+        '/events/:kind/:eventId/chat',
+        {
+          schema: {
+            params: eventParams,
+            body: { type: 'object', required: ['body'], additionalProperties: false, properties: { body: { type: 'string', maxLength: 2000 } } },
+          },
+        },
+        async (req, reply) => {
+          reply.code(201);
+          return chat.post(req.params.kind, req.params.eventId, await signedIn(req), req.body.body);
+        },
+      );
+
+      api.post<{ Params: { fixtureId: Id }; Body: { note?: string } | undefined }>(
+        '/fixtures/:fixtureId/lineup/chat',
+        { schema: { body: { type: ['object', 'null'], additionalProperties: false, properties: { note: { type: 'string', maxLength: 2000 } } } } },
+        async (req, reply) => {
+          reply.code(201);
+          return chat.postLineup(req.params.fixtureId, await signedIn(req), req.body?.note);
+        },
+      );
+
+      api.delete<{ Params: { messageId: Id } }>('/chat/messages/:messageId', async (req, reply) => {
+        await chat.remove(req.params.messageId, await signedIn(req));
+        return reply.code(204).send();
+      });
+
+      api.get<{ Params: { teamId: Id } }>('/teams/:teamId/chat-unread', async (req) =>
+        chat.unread(req.params.teamId, await signedIn(req)),
+      );
+
       // ---- Announcements (Phase 2) -------------------------------------------------
       api.get<{ Params: { teamId: Id } }>('/teams/:teamId/announcements', async (req) => {
         await access.requireTeamMember(await signedIn(req), req.params.teamId);
@@ -719,7 +766,7 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
         '/teams/:teamId/training',
         { schema: { querystring: { type: 'object', properties: { from: { type: 'string', format: 'date-time' } } } } },
         async (req) => {
-          await access.requireTeamMember(await signedIn(req), req.params.teamId);
+          await access.requireTeamViewer(await signedIn(req), req.params.teamId);
           return repo.listTrainingSessions(req.params.teamId, req.query.from);
         },
       );

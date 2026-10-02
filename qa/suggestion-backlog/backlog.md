@@ -34,9 +34,29 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0019**
+Next free id: **BL-0021**
 
 ---
+
+## BL-0020 — Phone navigation bar along the bottom
+- **Date:** 2026-10-02
+- **Source task:** C1 (app shell); owner: "See the bar at the bottom I want something similar in mobile view" (with Spond and Teamo screenshots)
+- **Idea:** On phones (720px and narrower) the row of tabs at the top is replaced by a bar along the bottom with icons, labels and badges: four main sections chosen by role plus More, which slides up a sheet with every other section and Sign out. Managers: Calendar, Chats, Lineup, Squad. Players: Calendar, Chats, Matches, Training. Parents: Children, Calendar, Chats, Membership. Desktop keeps the tab row (now with a Chats badge).
+- **Rationale:** The tab row had ten-plus entries that scrolled sideways on a phone; the bottom bar is what players and parents know from Spond and Teamo.
+- **Effort estimate:** S
+- **Owning agent:** C (shell)
+- **Status:** Approved — owner commissioned this directly.
+- **Outcome (2026-10-02):** Built and committed. Verified in a browser at phone width for a manager, a player and a parent (badges, More sheet, choosing a section from More highlights More) and at desktop width (no bar, tab row shown). The lineup screen itself is unchanged.
+
+## BL-0019 — Event chat: a group chat on every match and training session
+- **Date:** 2026-10-02
+- **Source task:** D6 (share-lineup UI); owner: "Each event should have a chat and I can share it in there that way it stays in the app" (replacing an open WhatsApp link, which was built on a branch and dropped before merging because of children's names)
+- **Idea:** Every match and training session has a group chat for the team's players, their parents and the managers. A Chats tab lists them (unread first) and the Calendar has a Chat button with an unread count on every event. Managers post the saved lineup into the match chat from the Share dialog, with an optional message; it shows as a card (pitch, bench, and folded-away substitutions and minutes). Messages are labelled Manager / Player / Parent of …; managers can remove any message, everyone their own.
+- **Rationale:** Keeps team chat, and children's names, inside the club's own app instead of WhatsApp.
+- **Effort estimate:** M
+- **Owning agent:** A/B (migration 011, chat service and routes), C/D (Chats, Calendar, Share dialog)
+- **Status:** Approved — owner commissioned this directly.
+- **Outcome (2026-10-02):** Built and committed. No private one-to-one messages: everyone who can see the team's schedule sees every message, the usual safeguarding expectation where children are involved. Parents can now also read their child's team fixtures and training list (needed to reach the chats). Lineup cards are snapshots with names and shirt numbers only, never ratings. Open chats refresh every 8 seconds and unread counts every 30. 4 new API tests, verified end to end in a browser (coach posts a lineup, a player sees the badge, reads it and replies, a parent joins from the Calendar, the coach sees 2 unread). Also fixed two API tests that already failed on main (they assumed U12 had 11 players after an earlier test adds a 12th). Not built yet: phone notifications for new messages (needs push), photos in chat, and the coach muting or closing a chat.
 
 ## BL-0018 — Flexible substitutions with drag and drop (rebuild of BL-0017, owner priority: top)
 - **Date:** 2026-10-02

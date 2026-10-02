@@ -37,6 +37,18 @@ export class Access {
     if (!clubAdmin && roles.size === 0) throw forbidden('You are not in this team');
   }
 
+  /** Team members (any role), club admins, and parents of a player in the team. */
+  async isTeamViewer(memberId: Id, teamId: Id) {
+    const { roles, clubAdmin } = await this.context(memberId, teamId);
+    if (clubAdmin || roles.size > 0) return true;
+    return (await this.repo.listChildren(memberId)).some((c) => c.teamIds.includes(teamId));
+  }
+
+  /** For read-only team views parents need too: the schedule and event chats. */
+  async requireTeamViewer(memberId: Id, teamId: Id) {
+    if (!(await this.isTeamViewer(memberId, teamId))) throw forbidden('You are not in this team');
+  }
+
   async requireClubMember(memberId: Id, clubId: Id) {
     const member = await this.repo.getMember(memberId);
     if (member?.clubId !== clubId) throw forbidden('You are not in this club');

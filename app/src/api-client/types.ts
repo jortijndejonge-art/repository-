@@ -1,4 +1,8 @@
 import type {
+  ChatMessage,
+  ChatThread,
+  ChatUnread,
+  EventKind,
   PlayerStats,
   Briefing,
   BriefingRead,
@@ -107,6 +111,14 @@ export interface ApiClient {
   getLineup(fixtureId: Id): Promise<Lineup | null>;
   saveLineup(fixtureId: Id, lineup: LineupDraft): Promise<Lineup>;
   shareLineup(fixtureId: Id, memberIds: Id[]): Promise<{ sharedWith: number }>;
+
+  // Event chat: a group chat on each match and training session
+  getEventChat(kind: EventKind, eventId: Id): Promise<ChatThread>;
+  postEventMessage(kind: EventKind, eventId: Id, body: string): Promise<ChatMessage>;
+  /** Manager: post the saved lineup into the match chat as a card. */
+  postLineupToChat(fixtureId: Id, note?: string): Promise<ChatMessage>;
+  deleteChatMessage(messageId: Id): Promise<void>;
+  getChatUnread(teamId: Id): Promise<ChatUnread[]>;
 }
 
 export class ApiError extends Error {

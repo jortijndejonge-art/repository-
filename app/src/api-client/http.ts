@@ -124,5 +124,10 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     },
     saveLineup: (fixtureId, lineup) => request('PUT', `/fixtures/${enc(fixtureId)}/lineup`, lineup),
     shareLineup: (fixtureId, memberIds) => request('POST', `/fixtures/${enc(fixtureId)}/lineup/share`, { memberIds }),
+    getEventChat: (kind, eventId) => request('GET', `/events/${kind}/${enc(eventId)}/chat`),
+    postEventMessage: (kind, eventId, body) => request('POST', `/events/${kind}/${enc(eventId)}/chat`, { body }),
+    postLineupToChat: (fixtureId, note) => request('POST', `/fixtures/${enc(fixtureId)}/lineup/chat`, note ? { note } : {}),
+    deleteChatMessage: (messageId) => request('DELETE', `/chat/messages/${enc(messageId)}`),
+    getChatUnread: (teamId) => request('GET', `/teams/${enc(teamId)}/chat-unread`),
   };
 }

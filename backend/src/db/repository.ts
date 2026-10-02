@@ -22,6 +22,9 @@ import type {
   FormationSlot,
   Id,
   Lineup,
+  LineupCard,
+  EventKind,
+  ChatUnread,
   Member,
   Role,
   MembershipPlan,
@@ -125,6 +128,15 @@ export interface Repository {
   getAnnouncement(id: Id): Promise<Announcement | null>;
   addAnnouncement(teamId: Id, authorId: Id, announcement: NewAnnouncement): Promise<Announcement>;
   deleteAnnouncement(id: Id): Promise<boolean>;
+
+  // Event chat
+  listEventMessages(kind: EventKind, eventId: Id): Promise<StoredMessage[]>;
+  addEventMessage(msg: { kind: EventKind; eventId: Id; teamId: Id; authorId: Id; body: string; lineup?: LineupCard }): Promise<StoredMessage>;
+  getEventMessage(id: Id): Promise<StoredMessage | null>;
+  deleteEventMessage(id: Id): Promise<void>;
+  markEventChatRead(kind: EventKind, eventId: Id, memberId: Id): Promise<void>;
+  /** Per event of this team: messages since the member last opened it (not counting their own), and the total. */
+  chatUnread(teamId: Id, memberId: Id): Promise<ChatUnread[]>;
 
   // Training
   listTrainingSessions(teamId: Id, from?: string): Promise<TrainingSession[]>;
@@ -264,6 +276,31 @@ const toCustomFormation = (r: Row): Formation => ({
   format: r.format as SquadFormat,
   slots: r.slots,
   teamId: r.team_id,
+});
+
+/** A chat message as stored; the service adds who the author is to the team (manager, player, parent of…). */
+export interface StoredMessage {
+  id: Id;
+  teamId: Id;
+  kind: EventKind;
+  eventId: Id;
+  authorId: Id | null;
+  authorName: string;
+  body: string;
+  lineup?: LineupCard;
+  createdAt: string;
+}
+
+const toStoredMessage = (r: Row): StoredMessage => ({
+  id: r.id,
+  teamId: r.team_id,
+  kind: r.fixture_id ? 'match' : 'training',
+  eventId: r.fixture_id ?? r.session_id,
+  authorId: r.author_id,
+  authorName: r.author_first ? `${r.author_first} ${r.author_last}` : 'Former member',
+  body: r.body,
+  ...(r.lineup ? { lineup: r.lineup } : {}),
+  createdAt: r.created_at,
 });
 
 const toFormationLayout = (r: Row): FormationLayout => ({ formationId: r.formation_id, positions: r.positions });
@@ -679,6 +716,71 @@ export class PgRepository implements Repository {
       [teamId, authorId, a.title, a.body],
     );
     return (await this.getAnnouncement(rows[0].id))!;
+  }
+
+  listEventMessages(kind: EventKind, eventId: Id) {
+    const column = kind === 'match' ? 'fixture_id' : 'session_id';
+    return this.many(
+      `SELECT m.*, a.first_name AS author_first, a.last_name AS author_last
+         FROM event_messages m LEFT JOIN members a ON a.id = m.author_id
+        WHERE m.${column} = $1 ORDER BY m.created_at, m.id`,
+      [eventId],
+      toStoredMessage,
+    );
+  }
+
+  async addEventMessage(msg: { kind: EventKind; eventId: Id; teamId: Id; authorId: Id; body: string; lineup?: LineupCard }) {
+    const { rows } = await this.pool.query(
+      `INSERT INTO event_messages (team_id, fixture_id, session_id, author_id, body, lineup)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [
+        msg.teamId,
+        msg.kind === 'match' ? msg.eventId : null,
+        msg.kind === 'training' ? msg.eventId : null,
+        msg.authorId,
+        msg.body,
+        msg.lineup ? JSON.stringify(msg.lineup) : null,
+      ],
+    );
+    return (await this.getEventMessage(rows[0].id))!;
+  }
+
+  getEventMessage(id: Id) {
+    return this.one(
+      `SELECT m.*, a.first_name AS author_first, a.last_name AS author_last
+         FROM event_messages m LEFT JOIN members a ON a.id = m.author_id WHERE m.id = $1`,
+      [id],
+      toStoredMessage,
+    );
+  }
+
+  async deleteEventMessage(id: Id) {
+    await this.pool.query('DELETE FROM event_messages WHERE id = $1', [id]);
+  }
+
+  async markEventChatRead(kind: EventKind, eventId: Id, memberId: Id) {
+    await this.pool.query(
+      `INSERT INTO event_chat_reads (event_key, member_id, last_read_at) VALUES ($1, $2, now())
+       ON CONFLICT (event_key, member_id) DO UPDATE SET last_read_at = now()`,
+      [`${kind}:${eventId}`, memberId],
+    );
+  }
+
+  chatUnread(teamId: Id, memberId: Id) {
+    return this.many(
+      `SELECT e.kind, e.event_id,
+              count(*)::int AS total,
+              (count(*) FILTER (WHERE m.created_at > COALESCE(r.last_read_at, '-infinity')
+                                  AND m.author_id IS DISTINCT FROM $2))::int AS unread
+         FROM event_messages m
+         CROSS JOIN LATERAL (SELECT CASE WHEN m.fixture_id IS NOT NULL THEN 'match' ELSE 'training' END AS kind,
+                                    COALESCE(m.fixture_id, m.session_id) AS event_id) e
+         LEFT JOIN event_chat_reads r ON r.event_key = e.kind || ':' || e.event_id AND r.member_id = $2
+        WHERE m.team_id = $1
+        GROUP BY e.kind, e.event_id`,
+      [teamId, memberId],
+      (r) => ({ kind: r.kind as EventKind, eventId: r.event_id as Id, unread: r.unread as number, total: r.total as number }),
+    );
   }
 
   async deleteAnnouncement(id: Id) {
