@@ -160,6 +160,33 @@ Real accounts and saved data need the backend (Node.js + PostgreSQL) running on 
 **variable** `VITE_API` to `http` (Settings → Secrets and variables → Actions → Variables) and the
 site switches to real sign-in on the next deploy.
 
+## The backend on the server (set up 2026-10-02)
+
+The API runs on the VPS, separate from the other apps:
+
+| Part | Where |
+| --- | --- |
+| Code | `/opt/myhockey` (a clone of this repo; update with `git pull`, then `pm2 restart myhockey-api`) |
+| Process | pm2 app `myhockey-api` on `127.0.0.1:3010` |
+| Database | its own Postgres in Docker, `myhockey-postgres`, on `127.0.0.1:5433` (memory capped at 256 MB; the Parts Picker database is untouched) |
+| Settings | `/etc/myhockey.env`, root only: `DATABASE_URL`, `APP_URL`, `MAIL_FROM`, and later the Stripe keys |
+| Apache | `/myhockey/api` is proxied to port 3010 in `vhost_ssl.conf` (backup `vhost_ssl.conf.bak-myhockey-api`) |
+
+Migrations apply automatically when the backend starts. Sign-in emails are sent by the server's own
+mail service (`MAIL_FROM`); they might land in spam, so check there. Change `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER` and `SMTP_PASS` in the settings file to use a mail provider instead.
+
+Create the real club (once), on the server in `/opt/myhockey`:
+
+```bash
+set -a; . /etc/myhockey.env; set +a
+npm run bootstrap -w backend -- --club "Club name" --first Jo --last Bloggs --email you@example.com   --team "U12 Girls:U12:7" --team "Men's 2s:Adult:11"
+```
+
+Then switch the website from demo to the real backend by setting the repository **variable**
+`VITE_API` to `http` (Settings → Secrets and variables → Actions → Variables) and redeploying.
+Until you do, the website stays in demo mode.
+
 ## Switching on Stripe payments (later)
 
 Membership payments are built and tested, and stay **off** until a Stripe account is connected.
