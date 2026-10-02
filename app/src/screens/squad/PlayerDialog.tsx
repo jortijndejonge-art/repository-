@@ -13,9 +13,11 @@ interface PlayerDialogProps {
   player?: PlayerProfile;
   onCancel: () => void;
   onSave: (player: NewPlayer) => Promise<void>;
+  /** Editing only: create a sign-in for this player; resolves with the details to hand over. */
+  onCreateLogin?: (email?: string) => Promise<{ email: string; password: string }>;
 }
 
-export function PlayerDialog({ player, onCancel, onSave }: PlayerDialogProps) {
+export function PlayerDialog({ player, onCancel, onSave, onCreateLogin }: PlayerDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -28,6 +30,32 @@ export function PlayerDialog({ player, onCancel, onSave }: PlayerDialogProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const editing = Boolean(player);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [login, setLogin] = useState<{ email: string; password: string } | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const createLogin = async () => {
+    setLoginError(null);
+    setCopied(false);
+    try {
+      setLogin(await onCreateLogin!(loginEmail.trim() || undefined));
+    } catch (e) {
+      setLogin(null);
+      setLoginError(e instanceof Error ? e.message : 'Could not create the sign-in');
+    }
+  };
+
+  const copyLogin = async () => {
+    if (!login) return;
+    try {
+      await navigator.clipboard.writeText(`Email: ${login.email}
+Password: ${login.password}`);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   useEffect(() => {
     ref.current?.showModal();
@@ -108,6 +136,33 @@ export function PlayerDialog({ player, onCancel, onSave }: PlayerDialogProps) {
           <input type="range" min={1} max={10} value={stamina} onChange={(e) => setStamina(Number(e.target.value))} />
         </label>
       </div>
+      {editing && onCreateLogin && (
+        <div className="squad-login">
+          <span className="field__label">Sign-in</span>
+          <label className="field">
+            <span className="muted small">Email (only needed if they don&apos;t have one yet)</span>
+            <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
+          </label>
+          <button type="button" className="btn" onClick={createLogin}>
+            Create sign-in password
+          </button>
+          {login && (
+            <div className="squad-login__result" role="status">
+              <div>Email: <strong>{login.email}</strong></div>
+              <div>Password: <strong>{login.password}</strong></div>
+              <p className="muted small">Shown once. Give it to {player!.displayName}; they can change it in Account.</p>
+              <button type="button" className="btn btn--ghost" onClick={copyLogin}>
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          )}
+          {loginError && (
+            <p className="squad-error" role="alert">
+              {loginError}
+            </p>
+          )}
+        </div>
+      )}
       {error && (
         <p className="squad-error" role="alert">
           {error}

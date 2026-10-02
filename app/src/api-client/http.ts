@@ -59,6 +59,8 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     },
     getSquad: (teamId) => request('GET', `/teams/${enc(teamId)}/players`),
     addPlayer: (teamId, player) => request('POST', `/teams/${enc(teamId)}/players`, player),
+    createPlayerLogin: (teamId, memberId, email) =>
+      request('POST', `/teams/${enc(teamId)}/players/${enc(memberId)}/login`, email ? { email } : undefined),
     updatePlayer: (teamId, memberId, update) =>
       request('PATCH', `/teams/${enc(teamId)}/players/${enc(memberId)}`, update),
     getPaymentsConfig: () => request('GET', '/payments/config'),

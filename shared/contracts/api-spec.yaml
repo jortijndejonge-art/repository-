@@ -241,6 +241,33 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PlayerProfile' }
 
+  /teams/{teamId}/players/{memberId}/login:
+    parameters:
+      - { $ref: '#/components/parameters/teamId' }
+      - { $ref: '#/components/parameters/memberId' }
+    post:
+      summary: Create (or reset) a player's sign-in password, optionally setting their email (manager/admin)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+      responses:
+        '200':
+          description: The new password, shown once
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [email, password]
+                properties:
+                  email: { type: string }
+                  password: { type: string }
+        '400': { description: No email address for this player }
+        '409': { description: Email already used by someone else in the club }
+
   /teams/{teamId}/fixtures:
     parameters: [{ $ref: '#/components/parameters/teamId' }]
     get:

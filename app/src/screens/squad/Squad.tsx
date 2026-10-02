@@ -88,7 +88,16 @@ export function Squad({ me }: { me: Me }) {
         </ul>
       )}
 
-      {dialog && <PlayerDialog player={dialog.player} onCancel={() => setDialog(null)} onSave={save} />}
+      {dialog && (
+        <PlayerDialog
+          player={dialog.player}
+          onCancel={() => setDialog(null)}
+          onSave={save}
+          onCreateLogin={
+            dialog.player ? (email) => api.createPlayerLogin(teamId, dialog.player!.memberId, email) : undefined
+          }
+        />
+      )}
     </section>
   );
 }

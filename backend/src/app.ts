@@ -169,6 +169,21 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
       // ---- B2. Accounts & roles ----------------------------------------------
       api.get('/me', async (req) => auth.me(await signedIn(req)));
 
+      api.post<{ Params: { teamId: Id; memberId: Id }; Body: { email?: string } | null }>(
+        '/teams/:teamId/players/:memberId/login',
+        {
+          schema: {
+            body: { type: ['object', 'null'], properties: { email: { type: 'string', maxLength: 320 } } },
+          },
+        },
+        async (req) => {
+          await access.requireManager(await signedIn(req), req.params.teamId);
+          const squad = await repo.listTeamPlayers(req.params.teamId);
+          if (!squad.some((p) => p.memberId === req.params.memberId)) throw notFound('Player not in this team');
+          return auth.createPlayerLogin(req.params.memberId, req.body?.email);
+        },
+      );
+
       api.get<{ Params: { clubId: Id } }>('/clubs/:clubId/teams', async (req) => {
         await access.requireClubMember(await signedIn(req), req.params.clubId);
         return repo.listClubTeams(req.params.clubId);

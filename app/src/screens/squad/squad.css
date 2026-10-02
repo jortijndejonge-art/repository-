@@ -86,3 +86,28 @@
     display: none;
   }
 }
+
+.squad-login {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.squad-login__result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--teal);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  word-break: break-all;
+}
+
+.squad-login__result p {
+  margin: 4px 0 0;
+}

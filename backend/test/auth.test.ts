@@ -19,6 +19,10 @@ function fakeRepo() {
     getTeam: async () => null,
     getPasswordHash: async (id: string) => hashes.get(id) ?? null,
     setPasswordHash: async (id: string, h: string) => void hashes.set(id, h),
+    setMemberEmail: async (_id: string, e: string) => {
+      if (e === 'taken@example.com') throw Object.assign(new Error('dup'), { code: '23505' });
+      member.email = e.toLowerCase();
+    },
     createSession: async (hash: string) => void sessions.push(hash),
   };
   return { repo: repo as unknown as Repository, hashes, sessions };
@@ -80,5 +84,27 @@ describe('password sign-in', () => {
     await auth.setPassword('m1', 'second password 2', 'first password 1');
     await expect(auth.loginWithPassword('jo@example.com', 'second password 2')).resolves.toBeTruthy();
     await expect(auth.loginWithPassword('jo@example.com', 'first password 1')).rejects.toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe('a manager creating a player sign-in', () => {
+  it('sets the email if given, creates a random password and lets the player sign in with it', async () => {
+    const f = fakeRepo();
+    (member as { email?: string }).email = undefined;
+    const auth = new AuthService(f.repo, new MemoryMailer(), config);
+    await expect(auth.createPlayerLogin('m1')).rejects.toMatchObject({ statusCode: 400 });
+    const login = await auth.createPlayerLogin('m1', 'Jo@Example.com');
+    expect(login.email).toBe('jo@example.com');
+    expect(login.password.length).toBeGreaterThanOrEqual(16);
+    await expect(auth.loginWithPassword('jo@example.com', login.password)).resolves.toBeTruthy();
+    const again = await auth.createPlayerLogin('m1');
+    expect(again.password).not.toBe(login.password);
+    await expect(auth.loginWithPassword('jo@example.com', login.password)).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it('refuses an email another member already uses', async () => {
+    const f = fakeRepo();
+    const auth = new AuthService(f.repo, new MemoryMailer(), config);
+    await expect(auth.createPlayerLogin('m1', 'taken@example.com')).rejects.toMatchObject({ statusCode: 409 });
   });
 });

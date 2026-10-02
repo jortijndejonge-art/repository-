@@ -91,6 +91,10 @@ export function createMockClient(): ApiClient {
       squads.set(teamId, [...squad, profile]);
       return delay({ ...profile });
     },
+    async createPlayerLogin(_teamId, _id, email) {
+      if (!email) throw new ApiError(400, 'Add an email address for this player first');
+      return delay({ email: email.toLowerCase(), password: 'demo-password-123' });
+    },
     async updatePlayer(teamId, id, update) {
       const player = (squads.get(teamId) ?? []).find((p) => p.memberId === id);
       if (!player) throw new ApiError(404, 'Player not in this team');

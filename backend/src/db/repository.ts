@@ -93,6 +93,8 @@ export interface Repository {
   markReminded(memberId: Id, planId: Id, at: Date): Promise<void>;
 
   // Auth
+  /** Throws a Postgres unique-violation (23505) if another member in the club already has this email. */
+  setMemberEmail(memberId: Id, email: string): Promise<void>;
   getPasswordHash(memberId: Id): Promise<string | null>;
   setPasswordHash(memberId: Id, hash: string): Promise<void>;
   createMagicLink(tokenHash: string, memberId: Id, expiresAt: Date): Promise<void>;
@@ -539,6 +541,10 @@ export class PgRepository implements Repository {
       [tokenHash],
       (r) => r.member_id as Id,
     );
+  }
+
+  async setMemberEmail(memberId: Id, email: string) {
+    await this.pool.query('UPDATE members SET email = lower($2) WHERE id = $1', [memberId, email.trim()]);
   }
 
   async getPasswordHash(memberId: Id) {

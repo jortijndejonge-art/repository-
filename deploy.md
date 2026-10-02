@@ -176,6 +176,12 @@ Migrations apply automatically when the backend starts. Sign-in emails are sent 
 mail service (`MAIL_FROM`); they might land in spam, so check there. Change `SMTP_HOST`, `SMTP_PORT`,
 `SMTP_USER` and `SMTP_PASS` in the settings file to use a mail provider instead.
 
+Signing in: email links need a working mail account (the server can't send mail itself, because the
+hosting provider blocks port 25), so members sign in with a password. Set yours with
+`cd /opt/myhockey/backend && node --env-file=/etc/myhockey.env --import tsx src/db/setPassword.ts --email you@example.com`
+(it prints a random one; change it later in the app's Account tab). Managers create players' sign-ins
+in the app: Squad → Edit → "Create sign-in password", then hand over the email and password shown.
+
 Create the real club (once), on the server in `/opt/myhockey`:
 
 ```bash

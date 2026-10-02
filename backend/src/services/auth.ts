@@ -4,7 +4,7 @@ import type { Repository } from '../db/repository';
 import { hashToken, newToken } from '../auth/tokens';
 import type { Mailer } from './mailer';
 import { generatePassword, hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '../auth/password';
-import { badRequest, HttpError, notFound, unauthorized } from './errors';
+import { badRequest, conflict, HttpError, notFound, unauthorized } from './errors';
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -105,6 +105,28 @@ export class AuthService {
       throw unauthorized('Your current password is wrong');
     }
     await this.repo.setPasswordHash(memberId, await hashPassword(newPassword));
+  }
+
+  /**
+   * A manager creates a sign-in for a player: sets their email if one is given, then a fresh
+   * random password. Returns it once, for the manager to hand over (the player can change it).
+   */
+  async createPlayerLogin(memberId: Id, email?: string): Promise<{ email: string; password: string }> {
+    const member = await this.repo.getMember(memberId);
+    if (!member) throw notFound('Member not found');
+    const address = (email ?? member.email ?? '').trim();
+    if (!address || !address.includes('@')) throw badRequest('Add an email address for this player first');
+    if (address.toLowerCase() !== member.email?.toLowerCase()) {
+      try {
+        await this.repo.setMemberEmail(memberId, address);
+      } catch (err) {
+        if ((err as { code?: string }).code === '23505') throw conflict('Someone in the club already uses that email');
+        throw err;
+      }
+    }
+    const password = generatePassword();
+    await this.repo.setPasswordHash(memberId, await hashPassword(password));
+    return { email: address.toLowerCase(), password };
   }
 
   /** Used by the set-password command: returns the password that was set. */

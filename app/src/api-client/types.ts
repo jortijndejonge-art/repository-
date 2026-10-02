@@ -40,6 +40,8 @@ export interface ApiClient {
 
   getSquad(teamId: Id): Promise<PlayerProfile[]>;
   addPlayer(teamId: Id, player: NewPlayer): Promise<PlayerProfile>;
+  /** Manager hands a player a sign-in: returns the email and a new password, shown once. */
+  createPlayerLogin(teamId: Id, memberId: Id, email?: string): Promise<{ email: string; password: string }>;
   updatePlayer(teamId: Id, memberId: Id, update: PlayerProfileUpdate): Promise<PlayerProfile>;
   getPaymentsConfig(): Promise<PaymentsConfig>;
   getMembershipPlans(clubId: Id): Promise<MembershipPlan[]>;
