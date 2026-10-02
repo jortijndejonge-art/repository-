@@ -1,4 +1,5 @@
 import type { Formation, SquadFormat } from '@hockey/contracts';
+import { buildCustomFormationSlots } from './customFormation';
 
 /**
  * Formations are drawn on one half-view of the pitch attacking upwards:
@@ -94,6 +95,22 @@ export const FORMATIONS: Formation[] = [
       { id: 'GK', label: 'GK', line: 'GK', x: 50, y: 93 },
     ],
   },
+  // The classic 11-a-side shapes below are named the way coaches here say them, front line first
+  // down to the keeper ("2-3-2-3 + GK" is two up front). Their layout is built by the same helper
+  // as custom formations, so a saved custom 2-3-2-3 looks identical.
+  ...[
+    [2, 3, 2, 3],
+    [3, 2, 3, 2],
+    [2, 3, 3, 2],
+    [3, 4, 3],
+  ].map(
+    (frontToBack): Formation => ({
+      id: `11-${frontToBack.join('-')}`,
+      name: `${frontToBack.join('-')} + GK`,
+      format: 11,
+      slots: buildCustomFormationSlots([...frontToBack].reverse()),
+    }),
+  ),
 ];
 
 export function formationsFor(format: SquadFormat): Formation[] {
