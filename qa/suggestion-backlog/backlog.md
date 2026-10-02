@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0021**
+Next free id: **BL-0022**
 
 ---
+
+## BL-0021 — Server deploys itself when main changes
+- **Date:** 2026-10-02
+- **Source task:** n/a (operations); owner: "when git has a new main that my server picks it up and deploys"
+- **Idea:** A systemd timer on the VPS checks GitHub's `main` every 2 minutes. On a new commit it fast-forwards `/opt/myhockey`, builds the website, restarts the backend and waits for its health check, then publishes the website. On a failed build or an unhealthy backend it rolls back and skips that commit until a newer one arrives.
+- **Rationale:** The GitHub deploy job was skipping (no secrets) and could only upload the website, not update the backend; deploys were being done by hand.
+- **Effort estimate:** S
+- **Owning agent:** n/a (server)
+- **Status:** Approved — owner commissioned this directly.
+- **Outcome (2026-10-02):** Script and timer committed in `deploy/server/` with an install guide; needs a one-time install on the VPS as root. Rehearsed against a local stand-in (fake GitHub remote, server copy, stub backend with a health check): no change, new commit, failed build, retry skipped, unhealthy backend, fix, hand-edited server copy, lock held, and same-size website files. The rehearsal caught a real bug: rsync skipped copying index.html when the size and second matched, so it now compares contents. Unit files pass `systemd-analyze verify`. Not run on the real server yet.
 
 ## BL-0020 — Phone navigation bar along the bottom
 - **Date:** 2026-10-02

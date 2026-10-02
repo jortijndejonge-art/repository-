@@ -1,0 +1,13 @@
+[Unit]
+Description=MyHockey: deploy GitHub main if it has changed
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/myhockey-autodeploy
+# pm2 keeps its process list in root's home.
+Environment=HOME=/root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Nice=10
+TimeoutStartSec=15min

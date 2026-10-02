@@ -160,6 +160,12 @@ Real accounts and saved data need the backend (Node.js + PostgreSQL) running on 
 **variable** `VITE_API` to `http` (Settings → Secrets and variables → Actions → Variables) and the
 site switches to real sign-in on the next deploy.
 
+## Automatic deploys (recommended)
+
+The server can deploy itself: a timer checks GitHub every 2 minutes and, when `main` has moved,
+updates the backend and the website together, with an automatic rollback if anything fails. No
+secrets on GitHub are needed. Setup and day-to-day commands: [deploy/server/README.md](deploy/server/README.md).
+
 ## The backend on the server (set up 2026-10-02)
 
 The API runs on the VPS, separate from the other apps:
