@@ -205,7 +205,7 @@ paths:
 
   /formations:
     get:
-      summary: Available formations, optionally filtered by squad format
+      summary: Built-in formations, optionally filtered by squad format
       parameters:
         - name: format
           in: query
@@ -216,6 +216,77 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Formation' } }
+
+  /teams/{teamId}/formations:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    get:
+      summary: This team's custom formations, optionally filtered by squad format
+      parameters:
+        - name: format
+          in: query
+          schema: { $ref: '#/components/schemas/SquadFormat' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Formation' } }
+    post:
+      summary: Save a custom formation from typed line counts (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewCustomFormation' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Formation' }
+        '400':
+          description: Line counts don't total 5, 7, or 11 including the keeper
+
+  /teams/{teamId}/formation-layouts:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    get:
+      summary: This team's saved position adjustments, one per formation they've adjusted
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/FormationLayout' } }
+
+  /teams/{teamId}/formation-layouts/{formationId}:
+    parameters:
+      - { $ref: '#/components/parameters/teamId' }
+      - { name: formationId, in: path, required: true, schema: { type: string } }
+    put:
+      summary: Save adjusted positions for a formation (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [positions]
+              properties:
+                positions:
+                  type: object
+                  additionalProperties: { $ref: '#/components/schemas/PitchPosition' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormationLayout' }
+        '400':
+          description: Unknown formation, or a position id that isn't in it
+    delete:
+      summary: Reset a formation back to its automatic layout (manager/admin)
+      responses:
+        '204': { description: Reset }
 
   /fixtures/{fixtureId}/lineup:
     parameters: [{ $ref: '#/components/parameters/fixtureId' }]
@@ -381,6 +452,36 @@ components:
         name: { type: string }
         format: { $ref: '#/components/schemas/SquadFormat' }
         slots: { type: array, items: { $ref: '#/components/schemas/FormationSlot' } }
+        teamId: { type: string, description: "Present only for a team's saved custom formation" }
+
+    PitchPosition:
+      type: object
+      required: [x, y]
+      properties:
+        x: { type: number, minimum: 0, maximum: 100, description: '0–100, left to right' }
+        y: { type: number, minimum: 0, maximum: 100, description: '0–100, halfway (0) to our back line (100)' }
+
+    FormationLayout:
+      type: object
+      required: [formationId, positions]
+      properties:
+        formationId: { type: string }
+        positions:
+          type: object
+          description: Per position id; overrides the automatic layout for that position
+          additionalProperties: { $ref: '#/components/schemas/PitchPosition' }
+
+    NewCustomFormation:
+      type: object
+      required: [name, lines]
+      properties:
+        name: { type: string }
+        lines:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { type: integer, minimum: 1, maximum: 5 }
+          description: 'Line counts defence-first through attack, e.g. [4, 3, 3]. GK is implicit; outfield + 1 must total 5, 7, or 11.'
 
     SlotAssignment:
       type: object

@@ -37,8 +37,8 @@ export const FORMATIONS: Formation[] = [
     slots: [
       { id: 'LF', label: 'LF', line: 'FWD', x: 32, y: 22 },
       { id: 'RF', label: 'RF', line: 'FWD', x: 68, y: 22 },
-      { id: 'LM', label: 'LM', line: 'MID', x: 28, y: 48 },
-      { id: 'RM', label: 'RM', line: 'MID', x: 72, y: 48 },
+      { id: 'LM', label: 'LM', line: 'MID', x: 24, y: 48 },
+      { id: 'RM', label: 'RM', line: 'MID', x: 76, y: 48 },
       { id: 'LB', label: 'LB', line: 'DEF', x: 32, y: 74 },
       { id: 'RB', label: 'RB', line: 'DEF', x: 68, y: 74 },
       { id: 'GK', label: 'GK', line: 'GK', x: 50, y: 92 },

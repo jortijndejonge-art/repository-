@@ -167,30 +167,15 @@
   height: var(--size);
   border-radius: 50%;
   background: var(--surface);
-  border: 3px solid var(--teal);
+  border: max(2px, calc(var(--size) * 0.06)) solid var(--teal);
   box-shadow: 0 3px 10px rgb(0 0 0 / 0.35);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
 .token__number {
   font-weight: 800;
-  font-size: calc(var(--size) * 0.36);
+  font-size: calc(var(--size) * 0.42);
   line-height: 1;
-}
-
-.token__slot {
-  position: absolute;
-  bottom: calc(var(--size) * -0.08);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--teal);
-  color: var(--teal-ink);
-  font-size: max(9px, calc(var(--size) * 0.2));
-  font-weight: 800;
-  line-height: 1;
-  padding: 2px 5px;
-  border-radius: 4px;
-  letter-spacing: 0.02em;
 }
 
 .token__name {
@@ -198,7 +183,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: max(9px, calc(var(--size) * 0.22));
+  font-size: max(10px, calc(var(--size) * 0.24));
   font-weight: 700;
   line-height: 1.2;
   padding: 1px 6px;
@@ -210,13 +195,10 @@
   border-color: var(--keeper);
 }
 
-.token--keeper .token__slot {
-  background: var(--keeper);
-}
-
+/* Not amber: that's the keeper's colour, so an out-of-position player read as a second keeper. */
 .token--oop .token__disc {
   border-style: dashed;
-  border-color: var(--amber);
+  border-color: var(--red);
 }
 
 .token--selected .token__disc {
@@ -226,8 +208,10 @@
     0 3px 10px rgb(0 0 0 / 0.35);
 }
 
-.token--dragging {
-  opacity: 0.35;
+/* Hidden but still laid out: wouldTouch measures it while its floating copy is dragged. */
+.token--dragging,
+.slot-filled:has(.token--dragging) .lock {
+  visibility: hidden;
 }
 
 .token:hover .token__disc {
@@ -261,31 +245,33 @@
   color: var(--teal);
 }
 
+/* Hidden until it's useful: on hover, on the selected player, or once locked. */
 .lock {
   position: absolute;
   top: calc(var(--token) * -0.12);
   right: calc(var(--token) * -0.14);
-  display: grid;
+  display: none;
   place-items: center;
-  width: max(20px, calc(var(--token) * 0.36));
-  height: max(20px, calc(var(--token) * 0.36));
+  width: max(18px, calc(var(--token) * 0.36));
+  height: max(18px, calc(var(--token) * 0.36));
   padding: 0;
   border-radius: 50%;
   border: 0;
-  background: rgb(21 25 28 / 0.7);
-  color: var(--text-muted);
+  background: rgb(21 25 28 / 0.85);
+  color: var(--text);
   cursor: pointer;
-  opacity: 0.55;
+}
+
+.slot-filled:hover .lock,
+.slot-filled:focus-within .lock,
+.slot-filled:has(.token--selected) .lock,
+.lock.is-locked {
+  display: grid;
 }
 
 .lock.is-locked {
   background: var(--teal);
   color: var(--teal-ink);
-  opacity: 1;
-}
-
-.lock:hover {
-  opacity: 1;
 }
 
 .lock-icon {
@@ -337,20 +323,34 @@
   margin: 0;
 }
 
-/* Drag ghost follows the pointer */
-.drag-ghost {
+/* The dragged player's token follows the pointer, its disc centred on it. --token is set inline in px. */
+.drag-float {
   position: fixed;
   z-index: 40;
-  transform: translate(-50%, -130%);
+  width: var(--token);
+  transform: translate(-50%, calc(var(--token) / -2));
+  display: flex;
+  justify-content: center;
   pointer-events: none;
-  background: var(--teal);
-  color: var(--teal-ink);
-  font-weight: 800;
-  font-size: 14px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  box-shadow: var(--shadow);
-  white-space: nowrap;
+}
+
+.drag-float .token__disc {
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.45);
+}
+
+/* Releasing here would do nothing. */
+.drag-float.is-nodrop {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+/* Solid red plus a glow — unlike the dashed out-of-position ring. */
+.drag-float .token--blocked .token__disc {
+  border-style: solid;
+  border-color: var(--red);
+  box-shadow:
+    0 0 0 4px rgb(240 112 112 / 0.35),
+    0 0 16px 4px rgb(240 112 112 / 0.55);
 }
 
 /* Substitution plan */
@@ -586,4 +586,49 @@
   white-space: pre-wrap;
   max-height: 160px;
   overflow: auto;
+}
+
+/* Save / reset bar for positions dragged on the pitch */
+.positions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+/* Custom formation dialog */
+.formation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.formation-form input[type='text'] {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 38px;
+}
+
+.formation-preview {
+  width: min(320px, 100%);
+  margin: 12px auto 0;
+}
+
+.formation-preview__slot {
+  width: var(--token);
+  height: var(--token);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px dashed rgb(244 247 245 / 0.7);
+  background: rgb(0 0 0 / 0.18);
+  color: var(--pitch-line);
+  font-weight: 800;
+  font-size: max(9px, calc(var(--token) * 0.22));
 }

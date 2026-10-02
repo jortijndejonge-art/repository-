@@ -8,6 +8,8 @@ interface PlayerTokenProps extends HTMLAttributes<HTMLButtonElement> {
   outOfPosition?: boolean;
   selected?: boolean;
   dragging?: boolean;
+  /** A drop here would touch another player, so it would be refused. */
+  blocked?: boolean;
   /** Shown only in the aria-label — the Planned minutes panel already covers this on the token itself. */
   minutes?: number;
 }
@@ -29,6 +31,7 @@ export function PlayerToken({
   outOfPosition,
   selected,
   dragging,
+  blocked,
   minutes,
   className,
   ...rest
@@ -39,6 +42,7 @@ export function PlayerToken({
     outOfPosition && 'token--oop',
     selected && 'token--selected',
     dragging && 'token--dragging',
+    blocked && 'token--blocked',
     className,
   ]
     .filter(Boolean)
@@ -54,10 +58,9 @@ export function PlayerToken({
     .join(' ');
 
   return (
-    <button type="button" className={classes} aria-label={label} aria-pressed={selected} {...rest}>
+    <button type="button" className={classes} aria-label={label} title={label} aria-pressed={selected} {...rest}>
       <span className="token__disc">
         <span className="token__number">{player.shirtNumber ?? initials(player.displayName)}</span>
-        {slotLabel && <span className="token__slot">{slotLabel}</span>}
       </span>
       <span className="token__name">{player.displayName}</span>
     </button>

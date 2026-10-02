@@ -3,6 +3,9 @@ import type {
   AvailabilityStatus,
   Club,
   Fixture,
+  Formation,
+  FormationLayout,
+  FormationSlot,
   Id,
   Lineup,
   Member,
@@ -36,6 +39,13 @@ export interface Repository {
   listTeamPlayers(teamId: Id): Promise<PlayerProfile[]>;
   addPlayer(teamId: Id, player: NewPlayer): Promise<PlayerProfile>;
   updatePlayer(memberId: Id, update: PlayerProfileUpdate): Promise<PlayerProfile | null>;
+
+  // Custom formations
+  listCustomFormations(teamId: Id, format?: SquadFormat): Promise<Formation[]>;
+  addCustomFormation(teamId: Id, formation: { name: string; format: SquadFormat; slots: FormationSlot[] }): Promise<Formation>;
+  listFormationLayouts(teamId: Id): Promise<FormationLayout[]>;
+  saveFormationLayout(teamId: Id, layout: FormationLayout): Promise<FormationLayout>;
+  deleteFormationLayout(teamId: Id, formationId: string): Promise<void>;
 
   // Fixtures & availability
   listTeamFixtures(teamId: Id, from?: string): Promise<Fixture[]>;
@@ -113,6 +123,16 @@ const toAvailability = (r: Row): Availability => ({
   ...(r.note ? { note: r.note } : {}),
   updatedAt: r.updated_at,
 });
+
+const toCustomFormation = (r: Row): Formation => ({
+  id: r.id,
+  name: r.name,
+  format: r.format as SquadFormat,
+  slots: r.slots,
+  teamId: r.team_id,
+});
+
+const toFormationLayout = (r: Row): FormationLayout => ({ formationId: r.formation_id, positions: r.positions });
 
 const PLAYER_COLUMNS = 'member_id, display_name, shirt_number, positions, skill, stamina, season_minutes';
 
@@ -235,6 +255,47 @@ export class PgRepository implements Repository {
       params,
       toPlayer,
     );
+  }
+
+  listCustomFormations(teamId: Id, format?: SquadFormat) {
+    return this.many(
+      'SELECT * FROM custom_formations WHERE team_id = $1 AND format = COALESCE($2, format) ORDER BY created_at',
+      [teamId, format ?? null],
+      toCustomFormation,
+    );
+  }
+
+  async addCustomFormation(teamId: Id, formation: { name: string; format: SquadFormat; slots: FormationSlot[] }) {
+    const row = (
+      await this.pool.query(
+        `INSERT INTO custom_formations (team_id, name, format, slots)
+         VALUES ($1, $2, $3, $4::jsonb) RETURNING *`,
+        [teamId, formation.name, formation.format, JSON.stringify(formation.slots)],
+      )
+    ).rows[0];
+    return toCustomFormation(row);
+  }
+
+  listFormationLayouts(teamId: Id) {
+    return this.many('SELECT * FROM formation_layouts WHERE team_id = $1', [teamId], toFormationLayout);
+  }
+
+  async saveFormationLayout(teamId: Id, layout: FormationLayout) {
+    const row = (
+      await this.pool.query(
+        `INSERT INTO formation_layouts (team_id, formation_id, positions, updated_at)
+         VALUES ($1, $2, $3::jsonb, now())
+         ON CONFLICT (team_id, formation_id)
+         DO UPDATE SET positions = EXCLUDED.positions, updated_at = now()
+         RETURNING *`,
+        [teamId, layout.formationId, JSON.stringify(layout.positions)],
+      )
+    ).rows[0];
+    return toFormationLayout(row);
+  }
+
+  async deleteFormationLayout(teamId: Id, formationId: string) {
+    await this.pool.query('DELETE FROM formation_layouts WHERE team_id = $1 AND formation_id = $2', [teamId, formationId]);
   }
 
   listTeamFixtures(teamId: Id, from?: string) {

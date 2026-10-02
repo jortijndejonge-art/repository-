@@ -56,6 +56,14 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     setAvailability: (fixtureId, memberId, status) =>
       request('PUT', `/fixtures/${enc(fixtureId)}/availability`, { memberId, status }),
     getFormations: (format) => request('GET', `/formations?format=${format}`),
+    getCustomFormations: (teamId, format) =>
+      request('GET', `/teams/${enc(teamId)}/formations${format ? `?format=${format}` : ''}`),
+    createCustomFormation: (teamId, input) => request('POST', `/teams/${enc(teamId)}/formations`, input),
+    getFormationLayouts: (teamId) => request('GET', `/teams/${enc(teamId)}/formation-layouts`),
+    saveFormationLayout: (teamId, { formationId, positions }) =>
+      request('PUT', `/teams/${enc(teamId)}/formation-layouts/${enc(formationId)}`, { positions }),
+    resetFormationLayout: (teamId, formationId) =>
+      request('DELETE', `/teams/${enc(teamId)}/formation-layouts/${enc(formationId)}`),
     suggest: ({ fixtureId, ...rest }) => request('POST', `/fixtures/${enc(fixtureId)}/lineup/suggest`, rest),
     async getLineup(fixtureId) {
       try {

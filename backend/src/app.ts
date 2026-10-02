@@ -3,17 +3,19 @@ import type {
   AvailabilityStatus,
   Id,
   Lineup,
+  NewCustomFormation,
   NewPlayer,
+  PitchPosition,
   PlayerProfileUpdate,
   SquadFormat,
   SuggestionRequest,
 } from '@hockey/contracts';
-import { formationsFor, FORMATIONS } from '@hockey/engine';
+import { buildCustomFormationSlots, formationsFor, validateLineCounts, FORMATIONS } from '@hockey/engine';
 import type { Config } from './config';
 import type { Repository } from './db/repository';
 import { Access } from './services/access';
 import { AuthService } from './services/auth';
-import { forbidden, HttpError, notFound, unauthorized } from './services/errors';
+import { badRequest, forbidden, HttpError, notFound, unauthorized } from './services/errors';
 import { LineupService } from './services/lineups';
 import type { Mailer } from './services/mailer';
 
@@ -244,6 +246,97 @@ export function buildApp({ repo, mailer, config, logger = false }: AppDeps): Fas
         const format = Number(req.query.format);
         return [5, 7, 11].includes(format) ? formationsFor(format as SquadFormat) : FORMATIONS;
       });
+
+      api.get<{ Params: { teamId: Id }; Querystring: { format?: string } }>('/teams/:teamId/formations', async (req) => {
+        await access.requireTeamMember(await signedIn(req), req.params.teamId);
+        const format = Number(req.query.format);
+        return repo.listCustomFormations(req.params.teamId, [5, 7, 11].includes(format) ? (format as SquadFormat) : undefined);
+      });
+
+      api.post<{ Params: { teamId: Id }; Body: NewCustomFormation }>(
+        '/teams/:teamId/formations',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['name', 'lines'],
+              additionalProperties: false,
+              properties: {
+                name: { type: 'string', minLength: 1, maxLength: 60 },
+                lines: {
+                  type: 'array',
+                  minItems: 2,
+                  maxItems: 4,
+                  items: { type: 'integer', minimum: 1, maximum: 5 },
+                },
+              },
+            },
+          },
+        },
+        async (req, reply) => {
+          await access.requireManager(await signedIn(req), req.params.teamId);
+          const check = validateLineCounts(req.body.lines);
+          if (!check.ok) throw badRequest(check.error);
+          reply.code(201);
+          return repo.addCustomFormation(req.params.teamId, {
+            name: req.body.name,
+            format: check.format,
+            slots: buildCustomFormationSlots(req.body.lines),
+          });
+        },
+      );
+
+      api.get<{ Params: { teamId: Id } }>('/teams/:teamId/formation-layouts', async (req) => {
+        await access.requireTeamMember(await signedIn(req), req.params.teamId);
+        return repo.listFormationLayouts(req.params.teamId);
+      });
+
+      api.put<{ Params: { teamId: Id; formationId: string }; Body: { positions: Record<string, PitchPosition> } }>(
+        '/teams/:teamId/formation-layouts/:formationId',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['positions'],
+              additionalProperties: false,
+              properties: {
+                positions: {
+                  type: 'object',
+                  additionalProperties: {
+                    type: 'object',
+                    required: ['x', 'y'],
+                    additionalProperties: false,
+                    properties: {
+                      x: { type: 'number', minimum: 0, maximum: 100 },
+                      y: { type: 'number', minimum: 0, maximum: 100 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        async (req) => {
+          const { teamId, formationId } = req.params;
+          await access.requireManager(await signedIn(req), teamId);
+          const formation = await lineups.resolveFormation(teamId, formationId);
+          if (!formation) throw badRequest(`Unknown formation ${formationId}`);
+          const slotIds = new Set(formation.slots.map((s) => s.id));
+          for (const id of Object.keys(req.body.positions)) {
+            if (!slotIds.has(id)) throw badRequest(`Position ${id} is not in formation ${formationId}`);
+          }
+          return repo.saveFormationLayout(teamId, { formationId, positions: req.body.positions });
+        },
+      );
+
+      api.delete<{ Params: { teamId: Id; formationId: string } }>(
+        '/teams/:teamId/formation-layouts/:formationId',
+        async (req, reply) => {
+          await access.requireManager(await signedIn(req), req.params.teamId);
+          await repo.deleteFormationLayout(req.params.teamId, req.params.formationId);
+          return reply.code(204).send();
+        },
+      );
 
       api.get<{ Params: { fixtureId: Id } }>('/fixtures/:fixtureId/lineup', async (req) => {
         await access.requireTeamMember(await signedIn(req), await fixtureTeam(req.params.fixtureId));

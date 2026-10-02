@@ -1,5 +1,5 @@
 import type { Id, Lineup, SuggestionRequest, SuggestionResult } from '@hockey/contracts';
-import { FORMATIONS, getFormation, suggestLineup } from '@hockey/engine';
+import { FORMATIONS, suggestLineup } from '@hockey/engine';
 import type { Repository } from '../db/repository';
 import { badRequest, conflict, notFound } from './errors';
 import type { Mailer } from './mailer';
@@ -15,6 +15,13 @@ export class LineupService {
     const fixture = await this.repo.getFixture(fixtureId);
     if (!fixture) throw notFound('Fixture not found');
     return fixture;
+  }
+
+  /** Looks up a built-in formation first, then this team's saved custom ones. */
+  async resolveFormation(teamId: Id, formationId: string) {
+    const builtIn = FORMATIONS.find((f) => f.id === formationId);
+    if (builtIn) return builtIn;
+    return (await this.repo.listCustomFormations(teamId)).find((f) => f.id === formationId);
   }
 
   /** The whole squad's availability for a fixture; players who haven't answered show as no_response. */
@@ -38,7 +45,7 @@ export class LineupService {
 
   async suggest(request: SuggestionRequest): Promise<SuggestionResult> {
     const fixture = await this.fixture(request.fixtureId);
-    const formation = FORMATIONS.find((f) => f.id === request.formationId);
+    const formation = await this.resolveFormation(fixture.teamId, request.formationId);
     if (!formation) throw badRequest(`Unknown formation ${request.formationId}`);
     const [players, availability] = await Promise.all([
       this.repo.listTeamPlayers(fixture.teamId),
@@ -57,12 +64,8 @@ export class LineupService {
 
   async save(fixtureId: Id, lineup: Pick<Lineup, 'formationId' | 'strategy' | 'starting' | 'bench' | 'substitutions'>) {
     const fixture = await this.fixture(fixtureId);
-    let formation;
-    try {
-      formation = getFormation(lineup.formationId);
-    } catch {
-      throw badRequest(`Unknown formation ${lineup.formationId}`);
-    }
+    const formation = await this.resolveFormation(fixture.teamId, lineup.formationId);
+    if (!formation) throw badRequest(`Unknown formation ${lineup.formationId}`);
     const squad = new Set((await this.repo.listTeamPlayers(fixture.teamId)).map((p) => p.memberId));
     const slotIds = new Set(formation.slots.map((s) => s.id));
     for (const s of lineup.starting) {

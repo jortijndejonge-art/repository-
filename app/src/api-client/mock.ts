@@ -1,6 +1,6 @@
-import type { Availability, Id, Lineup, Me } from '@hockey/contracts';
+import type { Availability, Formation, FormationLayout, Id, Lineup, Me } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
-import { formationsFor, getFormation, suggestLineup } from '@hockey/engine';
+import { buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
 import { ApiError, type ApiClient } from './types';
 
@@ -11,6 +11,8 @@ import { ApiError, type ApiClient } from './types';
 export function createMockClient(): ApiClient {
   const availability = demo.seedAvailability();
   const lineups = new Map<Id, Lineup>();
+  const customFormations = new Map<Id, Formation[]>();
+  const layouts = new Map<Id, Map<string, FormationLayout>>();
   let memberId: Id | null = sessionStore.get()?.replace(/^mock:/, '') ?? null;
 
   const delay = <T>(value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(value), 60));
@@ -18,6 +20,15 @@ export function createMockClient(): ApiClient {
     const f = demo.fixtures.find((x) => x.id === id);
     if (!f) throw new ApiError(404, 'Fixture not found');
     return f;
+  };
+  const resolveFormation = (teamId: Id, formationId: string): Formation => {
+    const custom = (customFormations.get(teamId) ?? []).find((f) => f.id === formationId);
+    if (custom) return custom;
+    try {
+      return getFormation(formationId);
+    } catch {
+      throw new ApiError(404, `Unknown formation: ${formationId}`);
+    }
   };
 
   function meFor(id: Id): Me {
@@ -68,6 +79,40 @@ export function createMockClient(): ApiClient {
     async getFormations(format) {
       return delay(formationsFor(format));
     },
+    async getCustomFormations(teamId, format) {
+      const all = customFormations.get(teamId) ?? [];
+      return delay(format ? all.filter((f) => f.format === format) : all);
+    },
+    async createCustomFormation(teamId, input) {
+      const check = validateLineCounts(input.lines);
+      if (!check.ok) throw new ApiError(400, check.error);
+      const formation: Formation = {
+        id: `custom-${teamId}-${Date.now().toString(36)}`,
+        name: input.name,
+        format: check.format,
+        slots: buildCustomFormationSlots(input.lines),
+        teamId,
+      };
+      const existing = customFormations.get(teamId) ?? [];
+      customFormations.set(teamId, [...existing, formation]);
+      return delay(formation);
+    },
+    async getFormationLayouts(teamId) {
+      return delay([...(layouts.get(teamId)?.values() ?? [])]);
+    },
+    async saveFormationLayout(teamId, layout) {
+      const formation = resolveFormation(teamId, layout.formationId);
+      const slotIds = new Set(formation.slots.map((s) => s.id));
+      if (Object.keys(layout.positions).some((id) => !slotIds.has(id))) throw new ApiError(400, 'Unknown position');
+      const team = layouts.get(teamId) ?? new Map<string, FormationLayout>();
+      team.set(layout.formationId, layout);
+      layouts.set(teamId, team);
+      return delay(layout);
+    },
+    async resetFormationLayout(teamId, formationId) {
+      layouts.get(teamId)?.delete(formationId);
+      await delay(undefined);
+    },
     async suggest(request) {
       const f = fixture(request.fixtureId);
       const available = new Set(
@@ -76,7 +121,7 @@ export function createMockClient(): ApiClient {
       return delay(
         suggestLineup({
           players: (demo.squads[f.teamId] ?? []).filter((p) => available.has(p.memberId)),
-          formation: getFormation(request.formationId),
+          formation: resolveFormation(f.teamId, request.formationId),
           strategy: request.strategy,
           durationMinutes: f.durationMinutes,
           periods: f.periods,

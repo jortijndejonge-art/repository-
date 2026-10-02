@@ -298,3 +298,87 @@ describe('lineups', () => {
     expect(res.json().every((f: { format: number }) => f.format === 11)).toBe(true);
   });
 });
+
+describe('custom formations', () => {
+  it('lets a manager save a custom formation and use it to suggest a lineup', async () => {
+    const coach = await signIn('coach@example.com');
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/v1/teams/u12/formations',
+      headers: as(coach),
+      payload: { name: '3-2-3-2 + GK', lines: [3, 2, 3, 2] },
+    });
+    expect(create.statusCode).toBe(201);
+    const formation = create.json();
+    expect(formation.format).toBe(11);
+    expect(formation.slots).toHaveLength(11);
+    expect(formation.slots.filter((s: { line: string }) => s.line === 'GK')).toHaveLength(1);
+
+    const list = await app.inject({ method: 'GET', url: '/api/v1/teams/u12/formations', headers: as(coach) });
+    expect(list.json().map((f: { id: string }) => f.id)).toContain(formation.id);
+
+    const suggest = await app.inject({
+      method: 'POST',
+      url: `/api/v1/fixtures/${U12_FIXTURE}/lineup/suggest`,
+      headers: as(coach),
+      payload: { formationId: formation.id, strategy: 'fair' },
+    });
+    expect(suggest.statusCode).toBe(200);
+    expect(Object.keys(suggest.json().projectedMinutes).length).toBeGreaterThan(0);
+  });
+
+  it('rejects line counts that do not total 5, 7, or 11, and blocks non-managers', async () => {
+    const coach = await signIn('coach@example.com');
+    const invalid = await app.inject({
+      method: 'POST',
+      url: '/api/v1/teams/u12/formations',
+      headers: as(coach),
+      payload: { name: 'Too many', lines: [4, 4, 4] },
+    });
+    expect(invalid.statusCode).toBe(400);
+
+    const p = await signIn(playerEmail);
+    const denied = await app.inject({
+      method: 'POST',
+      url: '/api/v1/teams/u12/formations',
+      headers: as(p),
+      payload: { name: '4-3-3 + GK', lines: [4, 3, 3] },
+    });
+    expect(denied.statusCode).toBe(403);
+  });
+});
+
+describe('formation layouts', () => {
+  it("saves, lists and resets a team's adjusted positions for a built-in formation", async () => {
+    const coach = await signIn('coach@example.com');
+    const url = '/api/v1/teams/u12/formation-layouts';
+    const save = await app.inject({
+      method: 'PUT',
+      url: `${url}/11-4-3-3`,
+      headers: as(coach),
+      payload: { positions: { LW: { x: 10, y: 15 } } },
+    });
+    expect(save.statusCode).toBe(200);
+    expect(save.json()).toEqual({ formationId: '11-4-3-3', positions: { LW: { x: 10, y: 15 } } });
+
+    const list = await app.inject({ method: 'GET', url, headers: as(coach) });
+    expect(list.json()).toContainEqual({ formationId: '11-4-3-3', positions: { LW: { x: 10, y: 15 } } });
+
+    const reset = await app.inject({ method: 'DELETE', url: `${url}/11-4-3-3`, headers: as(coach) });
+    expect(reset.statusCode).toBe(204);
+    expect((await app.inject({ method: 'GET', url, headers: as(coach) })).json()).toEqual([]);
+  });
+
+  it('rejects unknown positions, out-of-range coordinates, and non-managers', async () => {
+    const coach = await signIn('coach@example.com');
+    const url = '/api/v1/teams/u12/formation-layouts/11-4-3-3';
+    const badSlot = await app.inject({ method: 'PUT', url, headers: as(coach), payload: { positions: { XX: { x: 1, y: 1 } } } });
+    expect(badSlot.statusCode).toBe(400);
+    const badCoord = await app.inject({ method: 'PUT', url, headers: as(coach), payload: { positions: { LW: { x: 120, y: 1 } } } });
+    expect(badCoord.statusCode).toBe(400);
+
+    const p = await signIn(playerEmail);
+    const denied = await app.inject({ method: 'PUT', url, headers: as(p), payload: { positions: { LW: { x: 1, y: 1 } } } });
+    expect(denied.statusCode).toBe(403);
+  });
+});

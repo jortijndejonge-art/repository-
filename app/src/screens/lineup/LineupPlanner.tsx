@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type {
   AvailabilityStatus,
   Fixture,
   Formation,
   Id,
   Me,
+  PitchPosition,
   PlayerProfile,
   SlotAssignment,
   SquadFormat,
@@ -20,11 +22,12 @@ import { PlayerToken } from '../../components/pitch/PlayerToken';
 import { Segmented } from '../../core/Segmented';
 import { useToast } from '../../core/Toast';
 import { AvailabilityPanel } from './AvailabilityPanel';
+import { CustomFormationDialog } from './CustomFormationDialog';
 import { MinutesPanel } from './MinutesPanel';
 import { ShareDialog } from './ShareDialog';
 import { SubPlan } from './SubPlan';
-import { placeKey, useDragDrop } from './useDragDrop';
-import type { Place } from './useDragDrop';
+import { placeKey, useDragDrop, useDragState } from './useDragDrop';
+import type { DragStore, Place } from './useDragDrop';
 import './lineup.css';
 
 type Assignments = Record<string, Id | null>;
@@ -40,6 +43,9 @@ const STRATEGIES: { value: SuggestionStrategy; label: string; hint: string }[] =
   { value: 'strongest', label: 'Strongest', hint: 'Start and keep the strongest players on longest' },
   { value: 'stamina', label: 'Stamina', hint: 'Rotate low-stamina players in shorter stints' },
 ];
+
+/** Sentinel `<option>` value that opens the custom-formation dialog instead of selecting anything. */
+const NEW_FORMATION = '__new__';
 
 const FORMATS: { value: SquadFormat; label: string }[] = [
   { value: 5, label: '5-a-side' },
@@ -71,14 +77,32 @@ export function LineupPlanner({ me }: { me: Me }) {
   const [availability, setAvailability] = useState<Record<Id, AvailabilityStatus>>({});
   const [format, setFormat] = useState<SquadFormat>(7);
   const [formations, setFormations] = useState<Formation[]>([]);
+  /** This team's saved custom formations, any format — filtered per-format for display. */
+  const [customFormations, setCustomFormations] = useState<Formation[]>([]);
   const [formationId, setFormationId] = useState<string>('');
   const [strategy, setStrategy] = useState<SuggestionStrategy>('fair');
   const [assignments, setAssignments] = useState<Assignments>({});
   const [locks, setLocks] = useState<Set<string>>(new Set());
   const [plan, setPlan] = useState<Plan | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [newFormationOpen, setNewFormationOpen] = useState(false);
+  /** Per formation: positions the team has saved, and positions dragged but not yet saved. */
+  const [savedLayouts, setSavedLayouts] = useState<Record<string, Record<string, PitchPosition>>>({});
+  const [draftLayouts, setDraftLayouts] = useState<Record<string, Record<string, PitchPosition>>>({});
 
-  const formation = formations.find((f) => f.id === formationId) ?? null;
+  const customFormationsForFormat = useMemo(
+    () => customFormations.filter((f) => f.format === format),
+    [customFormations, format],
+  );
+  const allFormations = useMemo(
+    () => [...formations, ...customFormationsForFormat],
+    [formations, customFormationsForFormat],
+  );
+  const formation = allFormations.find((f) => f.id === formationId) ?? null;
+  const savedPositions = savedLayouts[formationId];
+  const positions = draftLayouts[formationId] ?? savedPositions ?? {};
+  const positionsUnsaved = formationId in draftLayouts;
+  const positionsAdjusted = positionsUnsaved || savedPositions !== undefined;
   const byId = useMemo(() => new Map(squad.map((p) => [p.memberId, p])), [squad]);
   const available = useMemo(
     () => squad.filter((p) => availability[p.memberId] === 'available'),
@@ -125,8 +149,15 @@ export function LineupPlanner({ me }: { me: Me }) {
         }
         return;
       }
-      const [avail, saved] = await Promise.all([api.getAvailability(fx.id), api.getLineup(fx.id)]);
-      const savedFormation = saved ? FORMATIONS.find((f) => f.id === saved.formationId) : undefined;
+      const [avail, saved, customForms, layouts] = await Promise.all([
+        api.getAvailability(fx.id),
+        api.getLineup(fx.id),
+        api.getCustomFormations(teamId),
+        api.getFormationLayouts(teamId),
+      ]);
+      const savedFormation = saved
+        ? (FORMATIONS.find((f) => f.id === saved.formationId) ?? customForms.find((f) => f.id === saved.formationId))
+        : undefined;
       const fmt = savedFormation?.format ?? fx.format;
       const forms = await api.getFormations(fmt);
       if (cancelled) return;
@@ -137,6 +168,9 @@ export function LineupPlanner({ me }: { me: Me }) {
       setAvailability(Object.fromEntries(avail.map((a) => [a.memberId, a.status])));
       setFormat(fmt);
       setFormations(forms);
+      setCustomFormations(customForms);
+      setSavedLayouts(Object.fromEntries(layouts.map((l) => [l.formationId, l.positions])));
+      setDraftLayouts({});
       setFormationId(formation.id);
       if (saved) {
         // Keep the saved lineup exactly; just re-plan substitutions around it.
@@ -184,8 +218,23 @@ export function LineupPlanner({ me }: { me: Me }) {
     runSuggest({ fixtureId: fixture.id, formationId: id, strategy, locked: [] });
   };
 
+  const createCustomFormation = async (input: { name: string; lines: number[] }) => {
+    if (!teamId) return;
+    const created = await api.createCustomFormation(teamId, input);
+    setCustomFormations((prev) => [...prev, created]);
+    await changeFormation(created.format, created.id);
+    setNewFormationOpen(false);
+    toast(`Saved "${created.name}"`);
+  };
+
   const move = useCallback(
     (memberId: Id, from: Place, to: Place) => {
+      if (to.kind === 'pitch') {
+        // Dropped on open grass: move that position, whoever plays it.
+        if (from.kind !== 'slot' || !formation) return;
+        setDraftLayouts((prev) => ({ ...prev, [formation.id]: { ...positions, [from.slotId]: to.spot } }));
+        return;
+      }
       const next = { ...assignments };
       const nextLocks = new Set(locks);
       if (to.kind === 'slot') {
@@ -216,10 +265,34 @@ export function LineupPlanner({ me }: { me: Me }) {
       replan(next);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [assignments, locks, fixture, formation, formationId, strategy, bench, plan],
+    [assignments, locks, fixture, formation, formationId, strategy, bench, plan, positions],
   );
 
-  const dnd = useDragDrop(move);
+  const savePositions = async () => {
+    if (!teamId || !positionsUnsaved) return;
+    try {
+      const layout = await api.saveFormationLayout(teamId, { formationId, positions });
+      setSavedLayouts((prev) => ({ ...prev, [formationId]: layout.positions }));
+      setDraftLayouts(({ [formationId]: _, ...rest }) => rest);
+      toast('Positions saved');
+    } catch (err) {
+      toast(`Couldn't save positions: ${(err as Error).message}`);
+    }
+  };
+
+  const resetPositions = async () => {
+    if (!teamId) return;
+    try {
+      if (savedPositions) await api.resetFormationLayout(teamId, formationId);
+      setSavedLayouts(({ [formationId]: _, ...rest }) => rest);
+      setDraftLayouts(({ [formationId]: _, ...rest }) => rest);
+      toast('Positions reset');
+    } catch (err) {
+      toast(`Couldn't reset positions: ${(err as Error).message}`);
+    }
+  };
+
+  const dnd = useDragDrop(move, () => toast('That would touch another player — try a little further away'));
 
   const toggleLock = (slotId: string) => {
     const next = new Set(locks);
@@ -340,12 +413,30 @@ export function LineupPlanner({ me }: { me: Me }) {
         <Segmented label="Format" options={FORMATS} value={format} onChange={(f) => changeFormation(f)} />
         <label className="field">
           <span className="field__label">Formation</span>
-          <select value={formationId} onChange={(e) => changeFormation(format, e.target.value)}>
-            {formations.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
+          <select
+            value={formationId}
+            onChange={(e) => {
+              if (e.target.value === NEW_FORMATION) setNewFormationOpen(true);
+              else changeFormation(format, e.target.value);
+            }}
+          >
+            <optgroup label="Standard">
+              {formations.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </optgroup>
+            {customFormationsForFormat.length > 0 && (
+              <optgroup label="Your formations">
+                {customFormationsForFormat.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <option value={NEW_FORMATION}>+ New formation…</option>
           </select>
         </label>
         <Segmented label="Strategy" options={STRATEGIES} value={strategy} onChange={setStrategy} />
@@ -381,6 +472,7 @@ export function LineupPlanner({ me }: { me: Me }) {
             <Pitch
               formation={formation}
               format={format}
+              positions={positions}
               renderSlot={(slot) => {
                 const memberId = assignments[slot.id];
                 const player = memberId ? byId.get(memberId) : undefined;
@@ -407,9 +499,9 @@ export function LineupPlanner({ me }: { me: Me }) {
                       keeper={slot.line === 'GK'}
                       outOfPosition={(positionFit(player, slot) ?? 0) < 0.85}
                       selected={dnd.selected?.memberId === player.memberId}
-                      dragging={dnd.drag?.memberId === player.memberId}
+                      dragging={dnd.draggingId === player.memberId}
                       minutes={plan?.projectedMinutes[player.memberId]}
-                      {...dnd.tokenHandlers(player.memberId, here, player.displayName)}
+                      {...dnd.tokenHandlers(player.memberId, here)}
                     />
                     <button
                       type="button"
@@ -426,6 +518,19 @@ export function LineupPlanner({ me }: { me: Me }) {
               }}
             />
           </div>
+
+          {positionsAdjusted && (
+            <div className="positions-bar" role="status">
+              <span className="muted small">{positionsUnsaved ? 'Positions moved — not saved yet' : 'Using your saved positions'}</span>
+              <span className="spacer" />
+              <button type="button" className="btn" onClick={resetPositions}>
+                Reset positions
+              </button>
+              <button type="button" className="btn btn--primary" onClick={savePositions} disabled={!positionsUnsaved}>
+                Save positions
+              </button>
+            </div>
+          )}
 
           <section
             className={`bench${dnd.hover === 'bench' ? ' is-hover' : ''}${dnd.selected?.from.kind === 'slot' ? ' is-armed' : ''}`}
@@ -447,16 +552,16 @@ export function LineupPlanner({ me }: { me: Me }) {
                   player={p}
                   keeper={p.positions[0] === 'GK'}
                   selected={dnd.selected?.memberId === p.memberId}
-                  dragging={dnd.drag?.memberId === p.memberId}
+                  dragging={dnd.draggingId === p.memberId}
                   minutes={plan?.projectedMinutes[p.memberId]}
                   className="token--bench"
-                  {...dnd.tokenHandlers(p.memberId, { kind: 'bench' }, p.displayName)}
+                  {...dnd.tokenHandlers(p.memberId, { kind: 'bench' })}
                 />
               ))}
             </div>
           </section>
           <p className="hint muted">
-            Tip: drag a player onto a position to swap, or tap one player then tap where they should go. Moved
+            Tip: drag a player onto another position to swap, or onto open grass to move that position. Swapped
             players are locked <LockIcon locked /> so “Suggest lineup” plans around them.
           </p>
         </div>
@@ -483,11 +588,7 @@ export function LineupPlanner({ me }: { me: Me }) {
         </aside>
       </div>
 
-      {dnd.drag && (
-        <div className="drag-ghost" style={{ left: dnd.drag.x, top: dnd.drag.y }} aria-hidden="true">
-          {dnd.drag.label}
-        </div>
-      )}
+      {dnd.draggingId && <DragFloat store={dnd.store} players={byId} formation={formation} />}
 
       {shareOpen && (
         <ShareDialog
@@ -496,6 +597,10 @@ export function LineupPlanner({ me }: { me: Me }) {
           onShare={share}
           summary={shareText(fixture, team, formation, assignments, bench, byId)}
         />
+      )}
+
+      {newFormationOpen && (
+        <CustomFormationDialog onCancel={() => setNewFormationOpen(false)} onCreate={createCustomFormation} />
       )}
     </div>
   );
@@ -518,6 +623,31 @@ function shareText(
     `Bench: ${bench.map((p) => p.displayName).join(', ') || '—'}`,
   ];
   return lines.join('\n');
+}
+
+/**
+ * The dragged player's token, following the pointer (all worked out by the
+ * drag hook). Over open grass it sits exactly where the player would land and
+ * turns red if dropping there would touch another player; where a drop would
+ * do nothing it fades.
+ */
+function DragFloat({ store, players, formation }: { store: DragStore; players: Map<Id, PlayerProfile>; formation: Formation }) {
+  const drag = useDragState(store);
+  const player = drag && players.get(drag.memberId);
+  if (!drag || !player) return null;
+  const { from } = drag;
+  const slot = from.kind === 'slot' ? formation.slots.find((s) => s.id === from.slotId) : undefined;
+  const style = { left: drag.x, top: drag.y, '--token': `${drag.size}px` } as CSSProperties;
+  return (
+    <div className={`drag-float${drag.status === 'none' ? ' is-nodrop' : ''}`} style={style} aria-hidden="true">
+      <PlayerToken
+        player={player}
+        keeper={slot ? slot.line === 'GK' : player.positions[0] === 'GK'}
+        blocked={drag.status === 'blocked'}
+        tabIndex={-1}
+      />
+    </div>
+  );
 }
 
 function LockIcon({ locked }: { locked: boolean }) {

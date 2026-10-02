@@ -150,6 +150,30 @@ export interface Formation {
   name: string;
   format: SquadFormat;
   slots: FormationSlot[];
+  /** Present only for a team's saved custom formation; absent for built-ins. */
+  teamId?: Id;
+}
+
+/** A point on our half of the pitch: x 0–100 left → right, y 0–100 halfway → our back line. */
+export interface PitchPosition {
+  x: number;
+  y: number;
+}
+
+/**
+ * A team's own placement of a formation's positions, overriding the automatic
+ * layout slot by slot. Belongs to the position, not the player, so it holds
+ * whoever plays there until the team resets it.
+ */
+export interface FormationLayout {
+  formationId: string;
+  positions: Record<string, PitchPosition>;
+}
+
+/** A coach-typed formation: line counts defence-first through attack (GK is implicit). */
+export interface NewCustomFormation {
+  name: string;
+  lines: number[];
 }
 
 // ---------------------------------------------------------------------------

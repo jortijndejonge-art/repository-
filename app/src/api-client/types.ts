@@ -4,9 +4,11 @@ import type {
   AuthSession,
   Fixture,
   Formation,
+  FormationLayout,
   Id,
   Lineup,
   Me,
+  NewCustomFormation,
   PlayerProfile,
   SquadFormat,
   SuggestionRequest,
@@ -33,6 +35,11 @@ export interface ApiClient {
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus): Promise<Availability>;
 
   getFormations(format: SquadFormat): Promise<Formation[]>;
+  getCustomFormations(teamId: Id, format?: SquadFormat): Promise<Formation[]>;
+  createCustomFormation(teamId: Id, input: NewCustomFormation): Promise<Formation>;
+  getFormationLayouts(teamId: Id): Promise<FormationLayout[]>;
+  saveFormationLayout(teamId: Id, layout: FormationLayout): Promise<FormationLayout>;
+  resetFormationLayout(teamId: Id, formationId: string): Promise<void>;
   suggest(request: SuggestionRequest): Promise<SuggestionResult>;
   getLineup(fixtureId: Id): Promise<Lineup | null>;
   saveLineup(fixtureId: Id, lineup: LineupDraft): Promise<Lineup>;
