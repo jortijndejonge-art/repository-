@@ -40,7 +40,7 @@ Next free id: **BL-0006**
 - **Effort estimate:** S–M
 - **Owning agent:** D (implementation), reviewed by E (functional) and F (visual)
 - **Status:** Approved — owner commissioned this directly.
-- **Outcome (2026-10-02):** Done, uncommitted.
+- **Outcome (2026-10-02):** Done, committed in 8c43cd9.
   - **Process:** a subagent (D) built it and an independent subagent (E+F) reviewed it twice.
   - **Review 1 — PASS WITH FIXES, six findings, all fixed:**
     - On touch the token is lifted 48px above the finger, and the drop uses the lifted point.
@@ -62,7 +62,7 @@ Next free id: **BL-0006**
 - **Effort estimate:** M
 - **Owning agent:** D (UI), A/B (`formation_layouts` table, routes)
 - **Status:** Approved — owner commissioned this directly.
-- **Outcome (2026-10-01):** Done, uncommitted. Verified in the mock-backed app: drag, save, swap, formation switch, overlap refusal and reset all work. The backend integration tests are written but need a Postgres to run; migration `003_formation_layouts.sql` must be applied on deploy.
+- **Outcome (2026-10-01):** Done, committed in 8c43cd9. Verified in the mock-backed app: drag, save, swap, formation switch, overlap refusal and reset all work. The backend integration tests are written but need a Postgres to run; migration `003_formation_layouts.sql` must be applied on deploy.
 
 ## BL-0003 — Keep rows clear of the 23 m line
 - **Date:** 2026-10-01
@@ -90,7 +90,7 @@ Next free id: **BL-0006**
 - **Effort estimate:** M
 - **Owning agent:** D (implementation), F (visual review)
 - **Status:** Approved — owner commissioned this directly.
-- **Outcome (2026-10-01):** Done, uncommitted. Fixed a double y-mapping bug in the custom-formation generator that made a 3-2-3-2 midfielder and forward touch. Forwards now sit a full token height below halfway. Rows are spaced evenly from halfway down to the keeper, as real lineup graphics do. Tokens are one size per format (5-a-side 64px, 7-a-side 60px, 11-a-side 49px at the test viewport), computed as the largest size at which every built-in and every saveable custom formation fits, counting the name label and lock, not just the disc. Custom formations are capped to realistic shapes: 5/7-a-side 3 lines, 11-a-side 4; at most 3/4/5 per line. Generated names are now real ones (LCB, LDM, CAM…). Independent visual review found no overlaps; its open suggestions are BL-0002 and BL-0003.
+- **Outcome (2026-10-01):** Done, committed in 8c43cd9. Fixed a double y-mapping bug in the custom-formation generator that made a 3-2-3-2 midfielder and forward touch. Forwards now sit a full token height below halfway. Rows are spaced evenly from halfway down to the keeper, as real lineup graphics do. Tokens are one size per format (5-a-side 64px, 7-a-side 60px, 11-a-side 49px at the test viewport), computed as the largest size at which every built-in and every saveable custom formation fits, counting the name label and lock, not just the disc. Custom formations are capped to realistic shapes: 5/7-a-side 3 lines, 11-a-side 4; at most 3/4/5 per line. Generated names are now real ones (LCB, LDM, CAM…). Independent visual review found no overlaps; its open suggestions are BL-0002 and BL-0003.
 - **Follow-up (owner, 2026-10-01):** One token size for every format: the 11-a-side size, 9% of pitch width (49px at the test viewport). Players in a row are now drawn exactly level, with the built-in staggers dropped. The per-format line limits existed only to keep the bigger 5/7-a-side tokens fitting, so they're gone: every format allows up to 4 lines and 5 per line, and a 7-a-side diamond is valid again.
 - **Follow-up (owner, 2026-10-01):** A custom 2-3-2-3 "looked nothing like the formation" because its pairs stood nearly as wide as its trios, which read as a checkerboard. Generated lines now use real-world widths: a pair is a tight central pair at 38/62 (LCB/RCB, LCM/RCM, LAM/RAM), and lines of 3+ spread to the flanks. Built-in formations keep their own hand-tuned widths.
 - **Follow-up (owner: "it looks like crap", 2026-10-01):** Redesigned after a critical self-review and an independent review subagent:

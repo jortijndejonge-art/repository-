@@ -1,4 +1,4 @@
-# Working in VS Code and deploying to www.solarbytez.com/myhockey
+# Working in VS Code and deploying to www.solarbytez.co.uk/myhockey
 
 The flow once set up:
 
@@ -101,7 +101,54 @@ Then delete the local `myhockey_deploy` file, or keep it somewhere safe. Never c
 ### d. Deploy
 
 Push anything to `main`, or go to **Actions → Test and deploy → Run workflow**. Then open
-**https://www.solarbytez.com/myhockey**.
+**https://www.solarbytez.co.uk/myhockey**.
+
+## Automatic deploy on every push to `main` (the plan)
+
+Every push to `main` runs the tests and, if they pass, builds the app and uploads it to the
+server. There is nothing to do by hand after the one-time setup below. Pushes to other branches
+and pull requests only run the tests.
+
+### Real server details (IONOS VPS `77.68.51.71`, see `C:\programming\SERVER-PATHS.md`)
+
+**Done on 2026-10-02:** the folder `/var/www/myhockey` and the Apache route below are already set up
+(config backup: `vhost_ssl.conf.bak-myhockey`). Only the GitHub secrets remain.
+
+The server is not a plain Plesk `httpdocs` site. Apache proxies each path to a pm2 Node app, and
+`/` goes to the marketing site, so `/myhockey` has to be added as its own route. The deploy
+key is `~/.ssh/solarbytez_deploy`, which logs in as the limited user `deploy`. That user has no
+access outside a few folders and cannot edit Apache, so the route is set up once as root:
+
+```bash
+# on the VPS, as root
+mkdir -p /var/www/myhockey && chown deploy:deploy /var/www/myhockey
+```
+
+Then add this to the Apache config for the site (`/var/www/vhosts/system/<domain>/conf/vhost_ssl.conf`,
+and `vhost.conf` if plain http is served), **above** the `/` proxy rule, and reload Apache
+(`plesk repair web -y` or `systemctl reload apache2`):
+
+```apache
+ProxyPass /myhockey !
+Alias /myhockey /var/www/myhockey
+<Directory /var/www/myhockey>
+    Require all granted
+    Options -Indexes
+    FallbackResource /myhockey/index.html
+</Directory>
+```
+
+GitHub secrets (repo → Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+| --- | --- |
+| `DEPLOY_HOST` | `77.68.51.71` |
+| `DEPLOY_USER` | `deploy` |
+| `DEPLOY_SSH_KEY` | full contents of `C:\Users\<you>\.ssh\solarbytez_deploy` (the private key) |
+| `DEPLOY_PATH` | `/var/www/myhockey` |
+
+Once these are set, the next push to `main` goes live at https://www.solarbytez.co.uk/myhockey (the server only serves solarbytez.co.uk; solarbytez.com does not point at it).
+Check progress under the repo's **Actions** tab.
 
 ## What goes live
 
