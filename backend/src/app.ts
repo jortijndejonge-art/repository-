@@ -1,9 +1,11 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type {
   AvailabilityStatus,
+  FixtureUpdate,
   Id,
   Lineup,
   NewCustomFormation,
+  NewFixture,
   NewMembershipPlan,
   NewPlayer,
   PitchPosition,
@@ -58,6 +60,15 @@ const substitution = {
     offMemberId: { type: 'string' },
     onMemberId: { type: 'string' },
   },
+} as const;
+const fixtureProps = {
+  opponent: { type: 'string', minLength: 1, maxLength: 120 },
+  startsAt: { type: 'string', format: 'date-time' },
+  venue: { type: 'string', minLength: 1, maxLength: 160 },
+  homeAway: { enum: ['home', 'away'] },
+  format: { enum: [5, 7, 11] },
+  durationMinutes: { type: 'integer', minimum: 5, maximum: 240 },
+  periods: { type: 'integer', minimum: 1, maximum: 8 },
 } as const;
 const strategy = { enum: ['fair', 'strongest', 'stamina'] } as const;
 
@@ -271,6 +282,40 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
           return repo.listTeamFixtures(req.params.teamId, req.query.from);
         },
       );
+
+      api.post<{ Params: { teamId: Id }; Body: NewFixture }>(
+        '/teams/:teamId/fixtures',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['opponent', 'startsAt', 'venue', 'homeAway', 'format', 'durationMinutes', 'periods'],
+              additionalProperties: false,
+              properties: fixtureProps,
+            },
+          },
+        },
+        async (req, reply) => {
+          await access.requireManager(await signedIn(req), req.params.teamId);
+          reply.code(201);
+          return repo.addFixture(req.params.teamId, req.body);
+        },
+      );
+
+      api.patch<{ Params: { fixtureId: Id }; Body: FixtureUpdate }>(
+        '/fixtures/:fixtureId',
+        { schema: { body: { type: 'object', additionalProperties: false, properties: fixtureProps } } },
+        async (req) => {
+          await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+          return (await repo.updateFixture(req.params.fixtureId, req.body)) ?? Promise.reject(notFound('Fixture not found'));
+        },
+      );
+
+      api.delete<{ Params: { fixtureId: Id } }>('/fixtures/:fixtureId', async (req, reply) => {
+        await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+        await repo.deleteFixture(req.params.fixtureId);
+        return reply.code(204).send();
+      });
 
       api.get<{ Params: { fixtureId: Id } }>('/fixtures/:fixtureId/availability', async (req) => {
         await access.requireTeamMember(await signedIn(req), await fixtureTeam(req.params.fixtureId));

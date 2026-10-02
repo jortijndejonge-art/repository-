@@ -4,6 +4,7 @@ import type {
   AuthSession,
   CheckoutSession,
   Fixture,
+  FixtureUpdate,
   Formation,
   FormationLayout,
   Id,
@@ -14,6 +15,7 @@ import type {
   NewMembershipPlan,
   PaymentsConfig,
   NewCustomFormation,
+  NewFixture,
   NewPlayer,
   PlayerProfile,
   PlayerProfileUpdate,
@@ -50,6 +52,9 @@ export interface ApiClient {
   /** Real mode returns a Stripe page to send the member to; demo mode simulates the payment. */
   startCheckout(planId: Id): Promise<CheckoutSession>;
   getFixtures(teamId: Id, from?: string): Promise<Fixture[]>;
+  addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
+  updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
+  deleteFixture(fixtureId: Id): Promise<void>;
   getAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus): Promise<Availability>;
 

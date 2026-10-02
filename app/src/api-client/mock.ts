@@ -1,4 +1,4 @@
-import type { Availability, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { Availability, Fixture, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -11,6 +11,7 @@ import { ApiError, type ApiClient } from './types';
 export function createMockClient(): ApiClient {
   const availability = demo.seedAvailability();
   const lineups = new Map<Id, Lineup>();
+  const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
   const plans: MembershipPlan[] = demo.membershipPlans.map((p) => ({ ...p }));
   const myMemberships: MembershipRecord[] = [];
   const squads = new Map<Id, PlayerProfile[]>(
@@ -22,7 +23,7 @@ export function createMockClient(): ApiClient {
 
   const delay = <T>(value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(value), 60));
   const fixture = (id: Id) => {
-    const f = demo.fixtures.find((x) => x.id === id);
+    const f = fixtures.find((x) => x.id === id);
     if (!f) throw new ApiError(404, 'Fixture not found');
     return f;
   };
@@ -127,7 +128,29 @@ export function createMockClient(): ApiClient {
       return delay({ demo: true });
     },
     async getFixtures(teamId, from) {
-      return delay(demo.fixtures.filter((f) => f.teamId === teamId && (!from || f.startsAt >= from)));
+      return delay(
+        fixtures
+          .filter((f) => f.teamId === teamId && (!from || f.startsAt >= from))
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+          .map((f) => ({ ...f })),
+      );
+    },
+    async addFixture(teamId, input) {
+      const created: Fixture = { id: `fx-${Date.now().toString(36)}`, teamId, ...input };
+      fixtures.push(created);
+      return delay({ ...created });
+    },
+    async updateFixture(id, update) {
+      const f = fixture(id);
+      Object.assign(f, update);
+      return delay({ ...f });
+    },
+    async deleteFixture(id) {
+      const at = fixtures.findIndex((f) => f.id === id);
+      if (at < 0) throw new ApiError(404, 'Fixture not found');
+      fixtures.splice(at, 1);
+      lineups.delete(id);
+      return delay(undefined);
     },
     async getAvailability(fixtureId) {
       return delay(availability.filter((a) => a.fixtureId === fixtureId).map((a) => ({ ...a })));

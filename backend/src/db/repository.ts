@@ -3,6 +3,8 @@ import type {
   AvailabilityStatus,
   Club,
   Fixture,
+  FixtureUpdate,
+  NewFixture,
   Formation,
   FormationLayout,
   FormationSlot,
@@ -69,6 +71,9 @@ export interface Repository {
   // Fixtures & availability
   listTeamFixtures(teamId: Id, from?: string): Promise<Fixture[]>;
   getFixture(id: Id): Promise<Fixture | null>;
+  addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
+  updateFixture(id: Id, update: FixtureUpdate): Promise<Fixture | null>;
+  deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
 
@@ -350,6 +355,39 @@ export class PgRepository implements Repository {
 
   getFixture(id: Id) {
     return this.one('SELECT * FROM fixtures WHERE id = $1', [id], toFixture);
+  }
+
+  async addFixture(teamId: Id, f: NewFixture) {
+    const { rows } = await this.pool.query(
+      `INSERT INTO fixtures (team_id, opponent, starts_at, venue, home_away, format, duration_minutes, periods)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [teamId, f.opponent, f.startsAt, f.venue, f.homeAway, f.format, f.durationMinutes, f.periods],
+    );
+    return toFixture(rows[0]);
+  }
+
+  async updateFixture(id: Id, u: FixtureUpdate) {
+    const columns: Record<string, unknown> = {
+      opponent: u.opponent,
+      starts_at: u.startsAt,
+      venue: u.venue,
+      home_away: u.homeAway,
+      format: u.format,
+      duration_minutes: u.durationMinutes,
+      periods: u.periods,
+    };
+    const set = Object.entries(columns).filter(([, v]) => v !== undefined);
+    if (set.length === 0) return this.getFixture(id);
+    return this.one(
+      `UPDATE fixtures SET ${set.map(([k], i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`,
+      [id, ...set.map(([, v]) => v)],
+      toFixture,
+    );
+  }
+
+  async deleteFixture(id: Id) {
+    const res = await this.pool.query('DELETE FROM fixtures WHERE id = $1', [id]);
+    return (res.rowCount ?? 0) > 0;
   }
 
   listAvailability(fixtureId: Id) {

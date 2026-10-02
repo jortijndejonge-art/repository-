@@ -382,3 +382,57 @@ describe('formation layouts', () => {
     expect(denied.statusCode).toBe(403);
   });
 });
+
+describe('fixtures', () => {
+  const newFixture = {
+    opponent: 'Test Town HC',
+    startsAt: '2030-05-04T10:00:00.000Z',
+    venue: 'Test Astro',
+    homeAway: 'home',
+    format: 7,
+    durationMinutes: 40,
+    periods: 4,
+  };
+
+  it('lets a manager add, edit and delete a fixture', async () => {
+    const coach = await signIn('coach@example.com');
+    const add = await app.inject({ method: 'POST', url: '/api/v1/teams/u12/fixtures', headers: as(coach), payload: newFixture });
+    expect(add.statusCode).toBe(201);
+    const created = add.json();
+    expect(created).toMatchObject({ ...newFixture, teamId: 'u12' });
+
+    const edit = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/fixtures/${created.id}`,
+      headers: as(coach),
+      payload: { opponent: 'Renamed HC', homeAway: 'away' },
+    });
+    expect(edit.statusCode).toBe(200);
+    expect(edit.json()).toMatchObject({ opponent: 'Renamed HC', homeAway: 'away', venue: 'Test Astro' });
+
+    const list = await app.inject({ method: 'GET', url: '/api/v1/teams/u12/fixtures', headers: as(coach) });
+    expect(list.json().map((f: { id: string }) => f.id)).toContain(created.id);
+
+    const del = await app.inject({ method: 'DELETE', url: `/api/v1/fixtures/${created.id}`, headers: as(coach) });
+    expect(del.statusCode).toBe(204);
+    const after = await app.inject({ method: 'GET', url: '/api/v1/teams/u12/fixtures', headers: as(coach) });
+    expect(after.json().map((f: { id: string }) => f.id)).not.toContain(created.id);
+  });
+
+  it('rejects bad input and players who are not managers', async () => {
+    const coach = await signIn('coach@example.com');
+    const bad = await app.inject({
+      method: 'POST',
+      url: '/api/v1/teams/u12/fixtures',
+      headers: as(coach),
+      payload: { ...newFixture, format: 9 },
+    });
+    expect(bad.statusCode).toBe(400);
+
+    const p = await signIn(playerEmail);
+    const denied = await app.inject({ method: 'POST', url: '/api/v1/teams/u12/fixtures', headers: as(p), payload: newFixture });
+    expect(denied.statusCode).toBe(403);
+    const deniedDelete = await app.inject({ method: 'DELETE', url: `/api/v1/fixtures/${U12_FIXTURE}`, headers: as(p) });
+    expect(deniedDelete.statusCode).toBe(403);
+  });
+});

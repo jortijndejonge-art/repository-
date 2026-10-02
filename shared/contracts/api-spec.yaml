@@ -270,8 +270,21 @@ paths:
 
   /teams/{teamId}/fixtures:
     parameters: [{ $ref: '#/components/parameters/teamId' }]
+    post:
+      summary: Add a fixture (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewFixture' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Fixture' }
     get:
-      summary: Fixtures for a team, soonest first
+      summary: Fixtures for a team, soonest first (POST adds one: manager/admin)
       parameters:
         - name: from
           in: query
@@ -283,6 +296,27 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Fixture' } }
+
+  /fixtures/{fixtureId}:
+    parameters:
+      - { name: fixtureId, in: path, required: true, schema: { type: string } }
+    patch:
+      summary: Edit a fixture (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FixtureUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Fixture' }
+    delete:
+      summary: Delete a fixture with its availability and lineup (manager/admin)
+      responses:
+        '204': { description: Deleted }
 
   /fixtures/{fixtureId}/availability:
     parameters: [{ $ref: '#/components/parameters/fixtureId' }]
@@ -527,6 +561,30 @@ components:
       properties:
         id: { type: string }
         teamId: { type: string }
+        opponent: { type: string }
+        startsAt: { type: string, format: date-time }
+        venue: { type: string }
+        homeAway: { type: string, enum: [home, away] }
+        format: { $ref: '#/components/schemas/SquadFormat' }
+        durationMinutes: { type: integer }
+        periods: { type: integer }
+
+    NewFixture:
+      type: object
+      required: [opponent, startsAt, venue, homeAway, format, durationMinutes, periods]
+      properties:
+        opponent: { type: string }
+        startsAt: { type: string, format: date-time }
+        venue: { type: string }
+        homeAway: { type: string, enum: [home, away] }
+        format: { $ref: '#/components/schemas/SquadFormat' }
+        durationMinutes: { type: integer }
+        periods: { type: integer }
+
+    FixtureUpdate:
+      type: object
+      description: Any subset of the NewFixture fields.
+      properties:
         opponent: { type: string }
         startsAt: { type: string, format: date-time }
         venue: { type: string }

@@ -5,6 +5,7 @@ import { ToastProvider } from './core/Toast';
 import { SignIn } from './screens/auth/SignIn';
 import { Verify } from './screens/auth/Verify';
 import { MyMatches } from './screens/availability/MyMatches';
+import { Fixtures } from './screens/fixtures/Fixtures';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
 import { Account } from './screens/account/Account';
 import { Membership } from './screens/membership/Membership';
@@ -44,7 +45,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'matches' | 'lineup' | 'squad' | 'membership' | 'account';
+type Tab = 'matches' | 'lineup' | 'squad' | 'fixtures' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -56,6 +57,7 @@ function Shell({ me }: { me: Me }) {
   const tabs: { id: Tab; label: string }[] = [
     ...(plays ? [{ id: 'matches' as const, label: 'My matches' }] : []),
     ...(canManage ? [{ id: 'lineup' as const, label: 'Lineup planner' }] : []),
+    ...(canManage ? [{ id: 'fixtures' as const, label: 'Fixtures' }] : []),
     ...(canManage ? [{ id: 'squad' as const, label: 'Squad' }] : []),
     { id: 'membership' as const, label: 'Membership' },
     { id: 'account' as const, label: 'Account' },
@@ -96,6 +98,7 @@ function Shell({ me }: { me: Me }) {
       )}
 
       {tab === 'lineup' && canManage && <LineupPlanner me={me} />}
+      {tab === 'fixtures' && canManage && <Fixtures me={me} />}
       {tab === 'squad' && canManage && <Squad me={me} />}
       {tab === 'matches' && <MyMatches me={me} />}
       {tab === 'membership' && <Membership me={me} />}

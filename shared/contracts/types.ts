@@ -115,6 +115,11 @@ export interface Fixture {
   periods: number;
 }
 
+/** Adding a fixture to a team's calendar. */
+export type NewFixture = Omit<Fixture, 'id' | 'teamId'>;
+
+export type FixtureUpdate = Partial<NewFixture>;
+
 export type AvailabilityStatus = 'available' | 'unavailable' | 'maybe' | 'no_response';
 
 export interface Availability {

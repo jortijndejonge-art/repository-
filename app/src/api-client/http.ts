@@ -70,6 +70,9 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     startCheckout: (planId) => request('POST', `/membership-plans/${enc(planId)}/checkout`),
     getFixtures: (teamId, from) =>
       request('GET', `/teams/${enc(teamId)}/fixtures${from ? `?from=${enc(from)}` : ''}`),
+    addFixture: (teamId, fixture) => request('POST', `/teams/${enc(teamId)}/fixtures`, fixture),
+    updateFixture: (fixtureId, update) => request('PATCH', `/fixtures/${enc(fixtureId)}`, update),
+    deleteFixture: (fixtureId) => request('DELETE', `/fixtures/${enc(fixtureId)}`),
     getAvailability: (fixtureId) => request('GET', `/fixtures/${enc(fixtureId)}/availability`),
     setAvailability: (fixtureId, memberId, status) =>
       request('PUT', `/fixtures/${enc(fixtureId)}/availability`, { memberId, status }),

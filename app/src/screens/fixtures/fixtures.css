@@ -1,0 +1,76 @@
+.fixtures {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.fixtures__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fixtures__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fixtures__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.fixtures__row.is-past {
+  opacity: 0.55;
+}
+
+.fixtures__opponent {
+  font-weight: 600;
+}
+
+.fixtures__ha {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+
+.fixtures__actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.fixture-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.fixture-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .fixtures__row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
