@@ -10,6 +10,7 @@
     "seed": "tsx src/db/seed.ts",
     "bootstrap": "tsx src/db/bootstrap.ts",
     "set-password": "tsx src/db/setPassword.ts",
+    "add-member": "tsx src/db/addMember.ts",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },
