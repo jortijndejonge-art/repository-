@@ -34,9 +34,29 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0008**
+Next free id: **BL-0011**
 
 ---
+
+## BL-0010 — Training sessions: schedule, RSVP and attendance
+- **Date:** 2026-10-02
+- **Source task:** Phase 2 (training session management, attendance tracking)
+- **Idea:** Managers schedule training per team, players RSVP (in / maybe / can't make it), and managers tick who actually attended.
+- **Rationale:** Master plan Phase 2 makes the app the club's day-to-day tool, not just a matchday one.
+- **Effort estimate:** M
+- **Owning agent:** A/B (migration 006, routes), C (Training tab)
+- **Status:** Approved — owner commissioned this directly ("continue with the backlog").
+- **Outcome (2026-10-02):** Done, committed in 7712e87 and live. Verified in the browser (demo) and against the live API; DB integration tests added but only run in CI. Not built yet: a combined team calendar of matches and training, attendance stats across the season, and notifying players about new sessions (needs working email).
+
+## BL-0009 — Fixtures screen
+- **Date:** 2026-10-02
+- **Source task:** Phase 4a (single-club fixture admin, manual entry)
+- **Idea:** Managers add, edit and delete a team's matches.
+- **Rationale:** The lineup planner and availability need fixtures, and the club had no way to create them.
+- **Effort estimate:** M
+- **Owning agent:** B (routes), C (screen)
+- **Status:** Approved — owner commissioned this directly.
+- **Outcome (2026-10-02):** Done, committed in 0242c5a and live. The lineup planner still plans only a team's next match; a match picker there was left out because the lineup screen is frozen.
 
 ## BL-0007 — Squad screen: add and edit players
 - **Date:** 2026-10-02
