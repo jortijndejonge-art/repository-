@@ -34,9 +34,29 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0011**
+Next free id: **BL-0014**
 
 ---
+
+## BL-0013 — Parent layer: link parents to players, answer for their children
+- **Date:** 2026-10-02
+- **Source task:** Phase 3 (parent/guardian layer)
+- **Idea:** A manager links a parent to a player from the Squad screen (an existing parent is found by email; a new one is created with a first password). Parents get a "My children" tab to answer match availability and training RSVPs for each child.
+- **Rationale:** Master plan Phase 3 — parents manage availability on behalf of a child.
+- **Effort estimate:** M
+- **Owning agent:** A/B (migration 008, routes, access), C (Family screen, Squad dialog)
+- **Status:** Approved — owner commissioned this directly ("keep going").
+- **Outcome (2026-10-02):** Done, committed in 25d10f2 and f2f8011, live. Verified against the live site: the U12 Boys parent sees their child, answers for them (200) and is refused for another family's child (403). Not built yet: parents seeing pickup times and payments for a child, and a parent following several teams' lineups.
+
+## BL-0012 — Announcements and a ready email provider
+- **Date:** 2026-10-02
+- **Source task:** Phase 2 (announcements / messaging channel)
+- **Idea:** Managers post to a squad in the app, and the backend can send email through Resend's web API once an account exists.
+- **Rationale:** Master plan Phase 2; email can't go out from the VPS (hosting blocks the mail ports), so an HTTPS provider is the scalable route.
+- **Effort estimate:** M
+- **Owning agent:** B/C
+- **Status:** Approved — owner commissioned this directly.
+- **Outcome (2026-10-02):** Announcements done and live (5dc93b4). The Resend mailer is built and unit-tested with a fake provider but not switched on or tried against real Resend; it needs an account, DNS records and two settings (see deploy.md). Announcements are not yet emailed out.
 
 ## BL-0010 — Training sessions: schedule, RSVP and attendance
 - **Date:** 2026-10-02
