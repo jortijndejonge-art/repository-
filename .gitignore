@@ -5,3 +5,9 @@ coverage/
 *.log
 .env
 .env.*
+
+# Local-only files: never commit
+.playwright-mcp/
+*.bundle
+*logins*
+*credentials*
