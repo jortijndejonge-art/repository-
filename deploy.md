@@ -179,13 +179,18 @@ mail service (`MAIL_FROM`); they might land in spam, so check there. Change `SMT
 Create the real club (once), on the server in `/opt/myhockey`:
 
 ```bash
-set -a; . /etc/myhockey.env; set +a
-npm run bootstrap -w backend -- --club "Club name" --first Jo --last Bloggs --email you@example.com   --team "U12 Girls:U12:7" --team "Men's 2s:Adult:11"
+cd /opt/myhockey/backend
+node --env-file=/etc/myhockey.env --import tsx src/db/bootstrap.ts --club "Club name" --first Jo --last Bloggs --email you@example.com   --team "U12 Girls:U12:7" --team "Men's 2s:Adult:11"
 ```
 
 Then switch the website from demo to the real backend by setting the repository **variable**
 `VITE_API` to `http` (Settings → Secrets and variables → Actions → Variables) and redeploying.
 Until you do, the website stays in demo mode.
+
+**Done 2026-10-02:** "My Fictive Club" (16 teams, admin jortijn@gmail.com) exists and the website was
+uploaded with `VITE_API=http`, so it now uses the real backend. Set the `VITE_API` variable on GitHub
+before turning on the automatic deploy, otherwise the next automatic deploy would put the site back
+into demo mode.
 
 ## Switching on Stripe payments (later)
 
