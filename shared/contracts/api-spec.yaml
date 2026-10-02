@@ -328,6 +328,58 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Fixture' } }
 
+  /fixtures/{fixtureId}/live:
+    parameters:
+      - { name: fixtureId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: The live clock and substitutions for a match, or null if it has not been started
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf: [{ $ref: '#/components/schemas/LiveMatch' }]
+
+  /fixtures/{fixtureId}/live/{action}:
+    parameters:
+      - { name: fixtureId, in: path, required: true, schema: { type: string } }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [start, pause, resume, finish] } }
+    post:
+      summary: Start (needs a saved lineup), pause, resume or finish the match clock (manager/admin). Finishing adds minutes to each player's season total, once.
+      responses:
+        '200':
+          description: The new state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveMatch' }
+        '409': { description: Not allowed in the match's current state }
+
+  /fixtures/{fixtureId}/live/substitute:
+    parameters:
+      - { name: fixtureId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Make a substitution now (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slotId, offMemberId, onMemberId]
+              properties:
+                slotId: { type: string }
+                offMemberId: { type: string }
+                onMemberId: { type: string }
+      responses:
+        '200':
+          description: The new state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveMatch' }
+        '409': { description: Player not in that position, or not available on the bench }
+
   /teams/{teamId}/announcements:
     parameters: [{ $ref: '#/components/parameters/teamId' }]
     get:
@@ -726,6 +778,24 @@ components:
         format: { $ref: '#/components/schemas/SquadFormat' }
         durationMinutes: { type: integer }
         periods: { type: integer }
+
+    LiveMatch:
+      type: object
+      required: [fixtureId, status, elapsedSeconds, substitutions]
+      properties:
+        fixtureId: { type: string }
+        status: { type: string, enum: [running, paused, finished] }
+        elapsedSeconds: { type: integer }
+        substitutions:
+          type: array
+          items:
+            type: object
+            required: [atSecond, slotId, offMemberId, onMemberId]
+            properties:
+              atSecond: { type: integer }
+              slotId: { type: string }
+              offMemberId: { type: string }
+              onMemberId: { type: string }
 
     GuardianSummary:
       type: object

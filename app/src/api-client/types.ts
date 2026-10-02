@@ -1,4 +1,5 @@
 import type {
+  LiveMatch,
   GuardianSummary,
   NewGuardian,
   Announcement,
@@ -63,6 +64,10 @@ export interface ApiClient {
   addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
   updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
   deleteFixture(fixtureId: Id): Promise<void>;
+  /** The live clock and substitutions for a match; null until it has been started. */
+  getLiveMatch(fixtureId: Id): Promise<LiveMatch | null>;
+  liveAction(fixtureId: Id, action: 'start' | 'pause' | 'resume' | 'finish'): Promise<LiveMatch>;
+  liveSubstitute(fixtureId: Id, slotId: string, offMemberId: Id, onMemberId: Id): Promise<LiveMatch>;
   getGuardians(teamId: Id, childId: Id): Promise<GuardianSummary[]>;
   /** Links a parent to a player; a brand-new parent also comes back with a first password, shown once. */
   addGuardian(teamId: Id, childId: Id, guardian: NewGuardian): Promise<{ guardian: GuardianSummary; password?: string }>;

@@ -73,6 +73,10 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     addFixture: (teamId, fixture) => request('POST', `/teams/${enc(teamId)}/fixtures`, fixture),
     updateFixture: (fixtureId, update) => request('PATCH', `/fixtures/${enc(fixtureId)}`, update),
     deleteFixture: (fixtureId) => request('DELETE', `/fixtures/${enc(fixtureId)}`),
+    getLiveMatch: (fixtureId) => request('GET', `/fixtures/${enc(fixtureId)}/live`),
+    liveAction: (fixtureId, action) => request('POST', `/fixtures/${enc(fixtureId)}/live/${action}`),
+    liveSubstitute: (fixtureId, slotId, offMemberId, onMemberId) =>
+      request('POST', `/fixtures/${enc(fixtureId)}/live/substitute`, { slotId, offMemberId, onMemberId }),
     getGuardians: (teamId, childId) => request('GET', `/teams/${enc(teamId)}/players/${enc(childId)}/guardians`),
     addGuardian: (teamId, childId, guardian) =>
       request('POST', `/teams/${enc(teamId)}/players/${enc(childId)}/guardians`, guardian),

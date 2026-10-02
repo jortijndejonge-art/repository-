@@ -140,6 +140,29 @@ export interface Fixture {
 }
 
 // ---------------------------------------------------------------------------
+// Live matchday
+// ---------------------------------------------------------------------------
+
+/** A substitution actually made during the match, `atSecond` seconds of playing time in. */
+export interface LiveSubstitution {
+  atSecond: number;
+  slotId: string;
+  offMemberId: Id;
+  onMemberId: Id;
+}
+
+export type LiveStatus = 'running' | 'paused' | 'finished';
+
+/** The state of a match being played: the clock and the changes made so far. */
+export interface LiveMatch {
+  fixtureId: Id;
+  status: LiveStatus;
+  /** Seconds of playing time so far (stops while paused). */
+  elapsedSeconds: number;
+  substitutions: LiveSubstitution[];
+}
+
+// ---------------------------------------------------------------------------
 // Announcements
 // ---------------------------------------------------------------------------
 

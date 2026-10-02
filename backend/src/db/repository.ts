@@ -3,6 +3,8 @@ import type {
   AvailabilityStatus,
   Club,
   Announcement,
+  LiveStatus,
+  LiveSubstitution,
   GuardianSummary,
   NewAnnouncement,
   Fixture,
@@ -84,6 +86,15 @@ export interface Repository {
   deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
+
+  // Live matchday
+  getLiveMatch(fixtureId: Id): Promise<{ status: LiveStatus; elapsedSeconds: number; resumedAt?: string } | null>;
+  createLiveMatch(fixtureId: Id, startedAt: Date): Promise<void>;
+  /** Changes a match that is not finished; returns false if it was already finished (or doesn't exist). */
+  updateLiveMatch(fixtureId: Id, update: { status: LiveStatus; elapsedSeconds: number; resumedAt: Date | null }): Promise<boolean>;
+  listLiveSubstitutions(fixtureId: Id): Promise<LiveSubstitution[]>;
+  addLiveSubstitution(fixtureId: Id, substitution: LiveSubstitution): Promise<void>;
+  addSeasonMinutes(memberId: Id, minutes: number): Promise<void>;
 
   // Guardians
   /** The children (members with a player profile) this guardian looks after, with the teams they play for. */
@@ -460,6 +471,49 @@ export class PgRepository implements Repository {
       toAvailability,
     );
     return row!;
+  }
+
+  getLiveMatch(fixtureId: Id) {
+    return this.one('SELECT * FROM live_matches WHERE fixture_id = $1', [fixtureId], (r) => ({
+      status: r.status as LiveStatus,
+      elapsedSeconds: r.elapsed_seconds as number,
+      ...(r.resumed_at ? { resumedAt: r.resumed_at as string } : {}),
+    }));
+  }
+
+  async createLiveMatch(fixtureId: Id, startedAt: Date) {
+    await this.pool.query(
+      "INSERT INTO live_matches (fixture_id, status, elapsed_seconds, resumed_at) VALUES ($1, 'running', 0, $2)",
+      [fixtureId, startedAt],
+    );
+  }
+
+  async updateLiveMatch(fixtureId: Id, u: { status: LiveStatus; elapsedSeconds: number; resumedAt: Date | null }) {
+    const res = await this.pool.query(
+      "UPDATE live_matches SET status = $2, elapsed_seconds = $3, resumed_at = $4 WHERE fixture_id = $1 AND status <> 'finished'",
+      [fixtureId, u.status, u.elapsedSeconds, u.resumedAt],
+    );
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  listLiveSubstitutions(fixtureId: Id) {
+    return this.many('SELECT * FROM live_substitutions WHERE fixture_id = $1 ORDER BY id', [fixtureId], (r) => ({
+      atSecond: r.at_second as number,
+      slotId: r.slot_id as string,
+      offMemberId: r.off_member_id as Id,
+      onMemberId: r.on_member_id as Id,
+    }));
+  }
+
+  async addLiveSubstitution(fixtureId: Id, s: LiveSubstitution) {
+    await this.pool.query(
+      'INSERT INTO live_substitutions (fixture_id, at_second, slot_id, off_member_id, on_member_id) VALUES ($1, $2, $3, $4, $5)',
+      [fixtureId, s.atSecond, s.slotId, s.offMemberId, s.onMemberId],
+    );
+  }
+
+  async addSeasonMinutes(memberId: Id, minutes: number) {
+    await this.pool.query('UPDATE player_profiles SET season_minutes = season_minutes + $2 WHERE member_id = $1', [memberId, minutes]);
   }
 
   async listChildren(guardianId: Id) {

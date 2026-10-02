@@ -24,6 +24,7 @@ import { Access } from './services/access';
 import { AuthService } from './services/auth';
 import { badRequest, forbidden, HttpError, notFound, unauthorized } from './services/errors';
 import { LineupService } from './services/lineups';
+import { LiveService } from './services/live';
 import { TrainingService } from './services/training';
 import type { Mailer } from './services/mailer';
 import { DisabledProvider, PaymentService, type PaymentProvider } from './services/payments';
@@ -89,6 +90,7 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
   const access = new Access(repo);
   const lineups = new LineupService(repo, mailer, config.appUrl);
   const training = new TrainingService(repo);
+  const live = new LiveService(repo);
   const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
 
   app.setErrorHandler((err, _req, reply) => {
@@ -555,6 +557,42 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
           await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
           reply.code(202);
           return lineups.share(req.params.fixtureId, req.body?.memberIds);
+        },
+      );
+
+      // ---- Live matchday (Phase 3) ---------------------------------------------------
+      api.get<{ Params: { fixtureId: Id } }>('/fixtures/:fixtureId/live', async (req) => {
+        await access.requireTeamMember(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+        return (await live.get(req.params.fixtureId)) ?? null;
+      });
+
+      for (const action of ['start', 'pause', 'resume', 'finish'] as const) {
+        api.post<{ Params: { fixtureId: Id } }>(`/fixtures/:fixtureId/live/${action}`, async (req) => {
+          await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+          return live[action](req.params.fixtureId);
+        });
+      }
+
+      api.post<{ Params: { fixtureId: Id }; Body: { slotId: string; offMemberId: Id; onMemberId: Id } }>(
+        '/fixtures/:fixtureId/live/substitute',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['slotId', 'offMemberId', 'onMemberId'],
+              additionalProperties: false,
+              properties: {
+                slotId: { type: 'string' },
+                offMemberId: { type: 'string' },
+                onMemberId: { type: 'string' },
+              },
+            },
+          },
+        },
+        async (req) => {
+          await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+          const { slotId, offMemberId, onMemberId } = req.body;
+          return live.substitute(req.params.fixtureId, slotId, offMemberId, onMemberId);
         },
       );
 

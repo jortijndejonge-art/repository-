@@ -1,0 +1,117 @@
+.matchday {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.matchday__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.matchday__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.matchday__clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.matchday__clock--running {
+  border-color: var(--teal);
+}
+
+.matchday__time {
+  font-size: 56px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.matchday__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.matchday__due {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid #f0b429;
+  border-left-width: 4px;
+  border-radius: var(--radius);
+}
+
+.matchday__lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.matchday__heading {
+  margin: 0 0 8px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.matchday__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.matchday__list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.matchday__slot {
+  display: inline-block;
+  min-width: 34px;
+  color: var(--teal);
+}
+
+.matchday__swap-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .matchday__lists {
+    grid-template-columns: 1fr;
+  }
+  .matchday__due {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

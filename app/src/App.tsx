@@ -10,6 +10,7 @@ import { Calendar } from './screens/calendar/Calendar';
 import { Family } from './screens/family/Family';
 import { Fixtures } from './screens/fixtures/Fixtures';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
+import { Matchday } from './screens/matchday/Matchday';
 import { Account } from './screens/account/Account';
 import { Membership } from './screens/membership/Membership';
 import { Squad } from './screens/squad/Squad';
@@ -49,7 +50,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'training' | 'membership' | 'account';
+type Tab = 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'matchday' | 'training' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -67,6 +68,7 @@ function Shell({ me }: { me: Me }) {
     ...(plays ? [{ id: 'matches' as const, label: 'My matches' }] : []),
     ...(canManage ? [{ id: 'lineup' as const, label: 'Lineup planner' }] : []),
     ...(canManage ? [{ id: 'fixtures' as const, label: 'Fixtures' }] : []),
+    ...(canManage ? [{ id: 'matchday' as const, label: 'Matchday' }] : []),
     ...(canManage || plays ? [{ id: 'training' as const, label: 'Training' }] : []),
     ...(canManage ? [{ id: 'squad' as const, label: 'Squad' }] : []),
     { id: 'membership' as const, label: 'Membership' },
@@ -109,6 +111,7 @@ function Shell({ me }: { me: Me }) {
 
       {tab === 'lineup' && canManage && <LineupPlanner me={me} />}
       {tab === 'fixtures' && canManage && <Fixtures me={me} />}
+      {tab === 'matchday' && canManage && <Matchday me={me} />}
       {tab === 'training' && <Training me={me} />}
       {tab === 'squad' && canManage && <Squad me={me} />}
       {tab === 'family' && <Family me={me} />}

@@ -1,6 +1,6 @@
-import type { Announcement, GuardianSummary, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { Announcement, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
-import { buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
+import { benchNow, pitchAt, secondsPlayed, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
 import { ApiError, type ApiClient } from './types';
 
@@ -13,6 +13,15 @@ export function createMockClient(): ApiClient {
   const lineups = new Map<Id, Lineup>();
   const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
   const announcements: Announcement[] = [];
+  // Live matches: playing time banked before the clock was last started, and when it was started (ms).
+  const liveMatches = new Map<Id, { status: LiveMatch['status']; banked: number; resumedAt: number | null; subs: LiveSubstitution[] }>();
+  const liveView = (fixtureId: Id): LiveMatch | null => {
+    const l = liveMatches.get(fixtureId);
+    if (!l) return null;
+    const running = l.status === 'running' && l.resumedAt !== null;
+    const elapsed = l.banked + (running ? Math.floor((Date.now() - l.resumedAt!) / 1000) : 0);
+    return { fixtureId, status: l.status, elapsedSeconds: elapsed, substitutions: l.subs.map((s) => ({ ...s })) };
+  };
   const guardians = new Map<string, GuardianSummary[]>();
   const trainingSessions: TrainingSession[] = [];
   const trainingResponses = new Map<string, TrainingResponse>();
@@ -130,6 +139,49 @@ export function createMockClient(): ApiClient {
       if (at >= 0) myMemberships[at] = record;
       else myMemberships.push(record);
       return delay({ demo: true });
+    },
+    async getLiveMatch(fixtureId) {
+      return delay(liveView(fixtureId));
+    },
+    async liveAction(fixtureId, action) {
+      const l = liveMatches.get(fixtureId);
+      if (action === 'start') {
+        if (l) throw new ApiError(409, 'This match has already been started');
+        if (!lineups.get(fixtureId)) throw new ApiError(400, 'Save a lineup for this match before starting it');
+        liveMatches.set(fixtureId, { status: 'running', banked: 0, resumedAt: Date.now(), subs: [] });
+        return delay(liveView(fixtureId)!);
+      }
+      if (!l) throw new ApiError(404, 'This match has not been started');
+      if (l.status === 'finished') {
+        if (action === 'finish') return delay(liveView(fixtureId)!);
+        throw new ApiError(409, 'The match is over');
+      }
+      const now = liveView(fixtureId)!.elapsedSeconds;
+      if (action === 'pause' && l.status === 'running') Object.assign(l, { status: 'paused', banked: now, resumedAt: null });
+      else if (action === 'resume' && l.status === 'paused') Object.assign(l, { status: 'running', resumedAt: Date.now() });
+      else if (action === 'finish') {
+        const lineup = lineups.get(fixtureId);
+        if (lineup) {
+          const f = fixture(fixtureId);
+          const squad = squads.get(f.teamId) ?? [];
+          for (const [id, seconds] of Object.entries(secondsPlayed(lineup.starting, l.subs, now))) {
+            const p = squad.find((x) => x.memberId === id);
+            if (p) p.seasonMinutes += Math.round(seconds / 60);
+          }
+        }
+        Object.assign(l, { status: 'finished', banked: now, resumedAt: null });
+      } else throw new ApiError(409, action === 'pause' ? 'The clock is not running' : 'The clock is not paused');
+      return delay(liveView(fixtureId)!);
+    },
+    async liveSubstitute(fixtureId, slotId, offMemberId, onMemberId) {
+      const l = liveMatches.get(fixtureId);
+      const lineup = lineups.get(fixtureId);
+      if (!l || !lineup) throw new ApiError(404, 'This match has not been started');
+      if (l.status === 'finished') throw new ApiError(409, 'The match is over');
+      if (pitchAt(lineup.starting, l.subs).get(slotId) !== offMemberId) throw new ApiError(409, 'That player is not in that position right now');
+      if (!benchNow(lineup.starting, lineup.bench, l.subs).includes(onMemberId)) throw new ApiError(409, 'That player is not available on the bench');
+      l.subs.push({ atSecond: liveView(fixtureId)!.elapsedSeconds, slotId, offMemberId, onMemberId });
+      return delay(liveView(fixtureId)!);
     },
     async getGuardians(_teamId, childId) {
       return delay((guardians.get(childId) ?? []).map((g) => ({ ...g })));
