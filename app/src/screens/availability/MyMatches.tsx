@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Availability, AvailabilityStatus, Fixture, Lineup, Me, Team } from '@hockey/contracts';
+import type { Availability, AvailabilityStatus, Briefing, Fixture, Lineup, Me, Team } from '@hockey/contracts';
 import { api } from '../../api-client';
 import { playingTeams } from '../../core/auth';
 import { useToast } from '../../core/Toast';
@@ -10,6 +10,7 @@ interface MatchCard {
   fixture: Fixture;
   availability: Availability[];
   lineup: Lineup | null;
+  briefing: Briefing | null;
 }
 
 const CHOICES: { status: AvailabilityStatus; label: string }[] = [
@@ -50,11 +51,12 @@ export function MyMatches({ me, subject }: { me: Me; subject?: Subject }) {
           const fixtures = await api.getFixtures(team.id, from);
           return Promise.all(
             fixtures.map(async (fixture) => {
-              const [availability, lineup] = await Promise.all([
+              const [availability, lineup, briefing] = await Promise.all([
                 api.getAvailability(fixture.id),
                 api.getLineup(fixture.id),
+                api.getBriefing(fixture.id, subject?.memberId),
               ]);
-              return { team, fixture, availability, lineup };
+              return { team, fixture, availability, lineup, briefing };
             }),
           );
         }),
@@ -83,6 +85,15 @@ export function MyMatches({ me, subject }: { me: Me; subject?: Subject }) {
     toast(status === 'available' ? 'See you there!' : status === 'maybe' ? 'Marked as maybe' : "Thanks for letting us know");
   };
 
+  const markSeen = async (card: MatchCard) => {
+    try {
+      await api.markBriefingSeen(card.fixture.id, subject?.memberId);
+      setCards((prev) => prev!.map((c) => (c.fixture.id === card.fixture.id && c.briefing ? { ...c, briefing: { ...c.briefing, seen: true } } : c)));
+    } catch {
+      toast('Could not save that');
+    }
+  };
+
   if (!cards) return <div className="loading">Loading your matches…</div>;
 
   return (
@@ -106,6 +117,33 @@ export function MyMatches({ me, subject }: { me: Me; subject?: Subject }) {
             <p className="match__meta muted">
               {kickoff(card.fixture.startsAt)} · {card.fixture.venue}
             </p>
+
+            {card.briefing && (
+              <details className="briefing" open={!card.briefing.seen}>
+                <summary>
+                  Coach&apos;s briefing {!card.briefing.seen && <span className="briefing__new">New</span>}
+                </summary>
+                {card.briefing.body && <p className="briefing__body">{card.briefing.body}</p>}
+                {card.briefing.links.length > 0 && (
+                  <ul className="briefing__links">
+                    {card.briefing.links.map((l) => (
+                      <li key={l.url}>
+                        <a href={l.url} target="_blank" rel="noopener noreferrer">
+                          {l.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {card.briefing.seen ? (
+                  <span className="muted small">You&apos;ve read this.</span>
+                ) : (
+                  <button type="button" className="btn" onClick={() => markSeen(card)}>
+                    Got it
+                  </button>
+                )}
+              </details>
+            )}
 
             {mine === 'no_response' && <p className="match__ask">Can you play?</p>}
             <div className="match__choices" role="radiogroup" aria-label={`Availability vs ${card.fixture.opponent}`}>

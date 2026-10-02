@@ -140,6 +140,37 @@ export interface Fixture {
 }
 
 // ---------------------------------------------------------------------------
+// Pre-match briefings
+// ---------------------------------------------------------------------------
+
+export interface BriefingLink {
+  label: string;
+  /** An http(s) address, e.g. a YouTube clip or a tactics page. */
+  url: string;
+}
+
+/** Coaching notes and links a manager attaches to a match. */
+export interface Briefing {
+  fixtureId: Id;
+  body: string;
+  links: BriefingLink[];
+  updatedAt: IsoDateTime;
+  /** Whether the asking member has read this version; editing the briefing resets it. */
+  seen?: boolean;
+}
+
+export interface NewBriefing {
+  body: string;
+  links: BriefingLink[];
+}
+
+/** One squad member's read receipt for the current version of a briefing. */
+export interface BriefingRead {
+  memberId: Id;
+  seen: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Live matchday
 // ---------------------------------------------------------------------------
 

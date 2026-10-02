@@ -73,6 +73,13 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     addFixture: (teamId, fixture) => request('POST', `/teams/${enc(teamId)}/fixtures`, fixture),
     updateFixture: (fixtureId, update) => request('PATCH', `/fixtures/${enc(fixtureId)}`, update),
     deleteFixture: (fixtureId) => request('DELETE', `/fixtures/${enc(fixtureId)}`),
+    getBriefing: (fixtureId, memberId) =>
+      request('GET', `/fixtures/${enc(fixtureId)}/briefing${memberId ? `?memberId=${enc(memberId)}` : ''}`),
+    saveBriefing: (fixtureId, briefing) => request('PUT', `/fixtures/${enc(fixtureId)}/briefing`, briefing),
+    deleteBriefing: (fixtureId) => request('DELETE', `/fixtures/${enc(fixtureId)}/briefing`),
+    getBriefingReads: (fixtureId) => request('GET', `/fixtures/${enc(fixtureId)}/briefing/reads`),
+    markBriefingSeen: (fixtureId, memberId) =>
+      request('POST', `/fixtures/${enc(fixtureId)}/briefing/seen`, memberId ? { memberId } : undefined),
     getLiveMatch: (fixtureId) => request('GET', `/fixtures/${enc(fixtureId)}/live`),
     liveAction: (fixtureId, action) => request('POST', `/fixtures/${enc(fixtureId)}/live/${action}`),
     liveSubstitute: (fixtureId, slotId, offMemberId, onMemberId) =>

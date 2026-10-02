@@ -1,4 +1,4 @@
-import type { Announcement, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { benchNow, pitchAt, secondsPlayed, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -13,6 +13,8 @@ export function createMockClient(): ApiClient {
   const lineups = new Map<Id, Lineup>();
   const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
   const announcements: Announcement[] = [];
+  const briefings = new Map<Id, Briefing>();
+  const briefingSeen = new Map<string, string>(); // "fixtureId/memberId" -> when read
   // Live matches: playing time banked before the clock was last started, and when it was started (ms).
   const liveMatches = new Map<Id, { status: LiveMatch['status']; banked: number; resumedAt: number | null; subs: LiveSubstitution[] }>();
   const liveView = (fixtureId: Id): LiveMatch | null => {
@@ -139,6 +141,38 @@ export function createMockClient(): ApiClient {
       if (at >= 0) myMemberships[at] = record;
       else myMemberships.push(record);
       return delay({ demo: true });
+    },
+    async getBriefing(fixtureId, forMember) {
+      const b = briefings.get(fixtureId);
+      if (!b) return delay(null);
+      const seenAt = briefingSeen.get(`${fixtureId}/${forMember ?? memberId}`);
+      return delay({ ...b, seen: Boolean(seenAt && seenAt >= b.updatedAt) });
+    },
+    async saveBriefing(fixtureId, input) {
+      for (const link of input.links) {
+        if (!/^https?:\/\//i.test(link.url.trim())) throw new ApiError(400, 'Links must start with http:// or https://');
+      }
+      const saved: Briefing = { fixtureId, body: input.body.trim(), links: input.links, updatedAt: new Date().toISOString(), seen: false };
+      briefings.set(fixtureId, saved);
+      return delay({ ...saved });
+    },
+    async deleteBriefing(fixtureId) {
+      briefings.delete(fixtureId);
+      return delay(undefined);
+    },
+    async getBriefingReads(fixtureId) {
+      const b = briefings.get(fixtureId);
+      const squad = squads.get(fixture(fixtureId).teamId) ?? [];
+      return delay(
+        squad.map((p) => {
+          const seenAt = briefingSeen.get(`${fixtureId}/${p.memberId}`);
+          return { memberId: p.memberId, seen: Boolean(b && seenAt && seenAt >= b.updatedAt) };
+        }),
+      );
+    },
+    async markBriefingSeen(fixtureId, forMember) {
+      briefingSeen.set(`${fixtureId}/${forMember ?? memberId}`, new Date(Date.now() + 1).toISOString());
+      return delay(undefined);
     },
     async getLiveMatch(fixtureId) {
       return delay(liveView(fixtureId));

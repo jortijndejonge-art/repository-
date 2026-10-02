@@ -328,6 +328,66 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Fixture' } }
 
+  /fixtures/{fixtureId}/briefing:
+    parameters:
+      - { name: fixtureId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: The pre-match briefing, or null. `seen` says whether you (or the child in `memberId`) read this version.
+      parameters:
+        - { name: memberId, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf: [{ $ref: '#/components/schemas/Briefing' }]
+    put:
+      summary: Create or replace the briefing (manager/admin). Editing resets everyone to unseen. Links must be http(s).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewBriefing' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Briefing' }
+    delete:
+      summary: Remove the briefing (manager/admin)
+      responses:
+        '204': { description: Deleted }
+
+  /fixtures/{fixtureId}/briefing/reads:
+    parameters:
+      - { name: fixtureId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Who in the squad has read the current briefing (manager/admin)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/BriefingRead' } }
+
+  /fixtures/{fixtureId}/briefing/seen:
+    parameters:
+      - { name: fixtureId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Mark the briefing as read, for yourself or (as a parent or manager) for a player in `memberId`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                memberId: { type: string }
+      responses:
+        '204': { description: Saved }
+
   /fixtures/{fixtureId}/live:
     parameters:
       - { name: fixtureId, in: path, required: true, schema: { type: string } }
@@ -778,6 +838,45 @@ components:
         format: { $ref: '#/components/schemas/SquadFormat' }
         durationMinutes: { type: integer }
         periods: { type: integer }
+
+    Briefing:
+      type: object
+      required: [fixtureId, body, links, updatedAt]
+      properties:
+        fixtureId: { type: string }
+        body: { type: string }
+        links:
+          type: array
+          items:
+            type: object
+            required: [label, url]
+            properties:
+              label: { type: string }
+              url: { type: string }
+        updatedAt: { type: string, format: date-time }
+        seen: { type: boolean }
+
+    NewBriefing:
+      type: object
+      required: [body, links]
+      properties:
+        body: { type: string, maxLength: 5000 }
+        links:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            required: [label, url]
+            properties:
+              label: { type: string }
+              url: { type: string }
+
+    BriefingRead:
+      type: object
+      required: [memberId, seen]
+      properties:
+        memberId: { type: string }
+        seen: { type: boolean }
 
     LiveMatch:
       type: object

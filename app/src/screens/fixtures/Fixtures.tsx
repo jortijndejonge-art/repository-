@@ -3,6 +3,7 @@ import type { Fixture, Id, Me, NewFixture } from '@hockey/contracts';
 import { api } from '../../api-client';
 import { managedTeams } from '../../core/auth';
 import { useToast } from '../../core/Toast';
+import { BriefingDialog } from './BriefingDialog';
 import { FixtureDialog } from './FixtureDialog';
 import './fixtures.css';
 
@@ -15,6 +16,7 @@ export function Fixtures({ me }: { me: Me }) {
   const [teamId, setTeamId] = useState<Id>(teams[0]?.id ?? '');
   const [fixtures, setFixtures] = useState<Fixture[] | null>(null);
   const [dialog, setDialog] = useState<{ fixture?: Fixture } | null>(null);
+  const [briefingFor, setBriefingFor] = useState<Fixture | null>(null);
   const team = teams.find((t) => t.id === teamId);
 
   const load = useCallback(async () => {
@@ -93,6 +95,9 @@ export function Fixtures({ me }: { me: Me }) {
                 </div>
               </div>
               <div className="fixtures__actions">
+                <button type="button" className="btn btn--ghost" onClick={() => setBriefingFor(f)}>
+                  Briefing
+                </button>
                 <button type="button" className="btn btn--ghost" onClick={() => setDialog({ fixture: f })}>
                   Edit
                 </button>
@@ -104,6 +109,8 @@ export function Fixtures({ me }: { me: Me }) {
           ))}
         </ul>
       )}
+
+      {briefingFor && <BriefingDialog fixture={briefingFor} teamId={teamId} onClose={() => setBriefingFor(null)} />}
 
       {dialog && team && (
         <FixtureDialog

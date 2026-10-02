@@ -1,4 +1,7 @@
 import type {
+  Briefing,
+  BriefingRead,
+  NewBriefing,
   LiveMatch,
   GuardianSummary,
   NewGuardian,
@@ -64,6 +67,13 @@ export interface ApiClient {
   addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
   updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
   deleteFixture(fixtureId: Id): Promise<void>;
+  /** The pre-match briefing, or null. `memberId` asks on behalf of a child. */
+  getBriefing(fixtureId: Id, memberId?: Id): Promise<Briefing | null>;
+  saveBriefing(fixtureId: Id, briefing: NewBriefing): Promise<Briefing>;
+  deleteBriefing(fixtureId: Id): Promise<void>;
+  /** Manager: who in the squad has read the current version. */
+  getBriefingReads(fixtureId: Id): Promise<BriefingRead[]>;
+  markBriefingSeen(fixtureId: Id, memberId?: Id): Promise<void>;
   /** The live clock and substitutions for a match; null until it has been started. */
   getLiveMatch(fixtureId: Id): Promise<LiveMatch | null>;
   liveAction(fixtureId: Id, action: 'start' | 'pause' | 'resume' | 'finish'): Promise<LiveMatch>;

@@ -3,6 +3,8 @@ import type {
   AvailabilityStatus,
   Club,
   Announcement,
+  Briefing,
+  NewBriefing,
   LiveStatus,
   LiveSubstitution,
   GuardianSummary,
@@ -86,6 +88,13 @@ export interface Repository {
   deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
+
+  // Briefings
+  getBriefing(fixtureId: Id): Promise<Briefing | null>;
+  saveBriefing(fixtureId: Id, briefing: NewBriefing): Promise<Briefing>;
+  deleteBriefing(fixtureId: Id): Promise<boolean>;
+  markBriefingSeen(fixtureId: Id, memberId: Id): Promise<void>;
+  listBriefingReads(fixtureId: Id): Promise<{ memberId: Id; seenAt: string }[]>;
 
   // Live matchday
   getLiveMatch(fixtureId: Id): Promise<{ status: LiveStatus; elapsedSeconds: number; resumedAt?: string } | null>;
@@ -218,6 +227,13 @@ const toAnnouncement = (r: Row): Announcement => ({
   title: r.title,
   body: r.body,
   createdAt: r.created_at,
+});
+
+const toBriefing = (r: Row): Briefing => ({
+  fixtureId: r.fixture_id,
+  body: r.body,
+  links: r.links,
+  updatedAt: r.updated_at,
 });
 
 const toTraining = (r: Row): TrainingSession => ({
@@ -471,6 +487,41 @@ export class PgRepository implements Repository {
       toAvailability,
     );
     return row!;
+  }
+
+  getBriefing(fixtureId: Id) {
+    return this.one('SELECT * FROM briefings WHERE fixture_id = $1', [fixtureId], toBriefing);
+  }
+
+  async saveBriefing(fixtureId: Id, b: NewBriefing) {
+    const { rows } = await this.pool.query(
+      `INSERT INTO briefings (fixture_id, body, links, updated_at) VALUES ($1, $2, $3::jsonb, now())
+       ON CONFLICT (fixture_id) DO UPDATE SET body = EXCLUDED.body, links = EXCLUDED.links, updated_at = now()
+       RETURNING *`,
+      [fixtureId, b.body, JSON.stringify(b.links)],
+    );
+    return toBriefing(rows[0]);
+  }
+
+  async deleteBriefing(fixtureId: Id) {
+    await this.pool.query('DELETE FROM briefing_reads WHERE fixture_id = $1', [fixtureId]);
+    const res = await this.pool.query('DELETE FROM briefings WHERE fixture_id = $1', [fixtureId]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  async markBriefingSeen(fixtureId: Id, memberId: Id) {
+    await this.pool.query(
+      `INSERT INTO briefing_reads (fixture_id, member_id, seen_at) VALUES ($1, $2, now())
+       ON CONFLICT (fixture_id, member_id) DO UPDATE SET seen_at = now()`,
+      [fixtureId, memberId],
+    );
+  }
+
+  listBriefingReads(fixtureId: Id) {
+    return this.many('SELECT member_id, seen_at FROM briefing_reads WHERE fixture_id = $1', [fixtureId], (r) => ({
+      memberId: r.member_id as Id,
+      seenAt: r.seen_at as string,
+    }));
   }
 
   getLiveMatch(fixtureId: Id) {

@@ -6,6 +6,7 @@ import type {
   Lineup,
   NewCustomFormation,
   NewAnnouncement,
+  NewBriefing,
   NewGuardian,
   NewFixture,
   NewTrainingSession,
@@ -23,6 +24,7 @@ import type { Repository } from './db/repository';
 import { Access } from './services/access';
 import { AuthService } from './services/auth';
 import { badRequest, forbidden, HttpError, notFound, unauthorized } from './services/errors';
+import { BriefingService } from './services/briefings';
 import { LineupService } from './services/lineups';
 import { LiveService } from './services/live';
 import { TrainingService } from './services/training';
@@ -91,6 +93,7 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
   const lineups = new LineupService(repo, mailer, config.appUrl);
   const training = new TrainingService(repo);
   const live = new LiveService(repo);
+  const briefings = new BriefingService(repo);
   const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
 
   app.setErrorHandler((err, _req, reply) => {
@@ -557,6 +560,77 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
           await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
           reply.code(202);
           return lineups.share(req.params.fixtureId, req.body?.memberIds);
+        },
+      );
+
+      // ---- Pre-match briefings (Phase 3) ---------------------------------------------
+      // `?memberId=` lets a parent ask on behalf of a child ("have they seen it?").
+      api.get<{ Params: { fixtureId: Id }; Querystring: { memberId?: Id } }>(
+        '/fixtures/:fixtureId/briefing',
+        { schema: { querystring: { type: 'object', properties: { memberId: { type: 'string' } } } } },
+        async (req) => {
+          const actor = await signedIn(req);
+          const teamId = await fixtureTeam(req.params.fixtureId);
+          await access.requireTeamMember(actor, teamId);
+          const forMember = req.query.memberId ?? actor;
+          if (forMember !== actor) await access.requireCanActFor(actor, forMember, teamId);
+          return (await briefings.get(req.params.fixtureId, forMember)) ?? null;
+        },
+      );
+
+      api.put<{ Params: { fixtureId: Id }; Body: NewBriefing }>(
+        '/fixtures/:fixtureId/briefing',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['body', 'links'],
+              additionalProperties: false,
+              properties: {
+                body: { type: 'string', maxLength: 5000 },
+                links: {
+                  type: 'array',
+                  maxItems: 10,
+                  items: {
+                    type: 'object',
+                    required: ['label', 'url'],
+                    additionalProperties: false,
+                    properties: { label: { type: 'string', maxLength: 120 }, url: { type: 'string', maxLength: 2000 } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        async (req) => {
+          await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+          return briefings.save(req.params.fixtureId, req.body);
+        },
+      );
+
+      api.delete<{ Params: { fixtureId: Id } }>('/fixtures/:fixtureId/briefing', async (req, reply) => {
+        await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+        await repo.deleteBriefing(req.params.fixtureId);
+        return reply.code(204).send();
+      });
+
+      api.get<{ Params: { fixtureId: Id } }>('/fixtures/:fixtureId/briefing/reads', async (req) => {
+        const teamId = await fixtureTeam(req.params.fixtureId);
+        await access.requireManager(await signedIn(req), teamId);
+        return briefings.reads(req.params.fixtureId, teamId);
+      });
+
+      api.post<{ Params: { fixtureId: Id }; Body: { memberId?: Id } | null }>(
+        '/fixtures/:fixtureId/briefing/seen',
+        { schema: { body: { type: ['object', 'null'], properties: { memberId: { type: 'string' } } } } },
+        async (req, reply) => {
+          const actor = await signedIn(req);
+          const teamId = await fixtureTeam(req.params.fixtureId);
+          const memberId = req.body?.memberId ?? actor;
+          await access.requireCanActFor(actor, memberId, teamId);
+          if (!(await repo.getBriefing(req.params.fixtureId))) throw notFound('No briefing for this match');
+          await repo.markBriefingSeen(req.params.fixtureId, memberId);
+          return reply.code(204).send();
         },
       );
 
