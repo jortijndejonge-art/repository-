@@ -16,6 +16,7 @@ function fakeRepo() {
     getMember: async (id: string) => (id === member.id ? member : null),
     getClub: async () => ({ id: 'club', name: 'Club' }),
     listMemberships: async () => [],
+    listChildren: async () => [],
     getTeam: async () => null,
     getPasswordHash: async (id: string) => hashes.get(id) ?? null,
     setPasswordHash: async (id: string, h: string) => void hashes.set(id, h),
