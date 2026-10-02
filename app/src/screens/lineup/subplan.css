@@ -1,0 +1,150 @@
+/* Editable substitution plan */
+.subplan__tip {
+  margin: 0 0 10px;
+}
+
+/* Stays in view while you scroll a long plan, so a player can always be dragged onto a change. */
+.subplan__chips {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.subplan__chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 13px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.subplan--edit {
+  gap: 8px;
+}
+
+.subplan__edit-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.subplan__edit-row.is-over {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px rgb(45 212 191 / 0.35);
+}
+
+.subplan__handle {
+  all: unset;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 18px;
+  touch-action: none;
+  user-select: none;
+}
+
+.subplan__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.subplan__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 8px;
+}
+
+.subplan__field select {
+  min-height: 34px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  width: 100%;
+}
+
+.subplan__field--on.is-over select {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px rgb(45 212 191 / 0.45);
+}
+
+.subplan__field-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.subplan__field--on .subplan__field-label {
+  color: var(--green-ok);
+}
+
+.subplan__edit-row .subplan__off {
+  align-self: end;
+  font-size: 13px;
+  padding-bottom: 6px;
+}
+
+.subplan__edit-row .subplan__break {
+  grid-column: 2;
+}
+
+.subplan__remove {
+  all: unset;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px 6px;
+}
+
+.subplan__remove:hover {
+  color: var(--red);
+}
+
+.subplan__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.subplan__float {
+  position: fixed;
+  z-index: 50;
+  transform: translate(12px, 12px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--teal);
+  color: #04201c;
+  font-weight: 700;
+  font-size: 13px;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+}
+
+@media (max-width: 520px) {
+  .subplan__fields {
+    grid-template-columns: 1fr;
+  }
+}

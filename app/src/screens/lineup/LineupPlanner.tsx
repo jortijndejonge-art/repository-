@@ -14,7 +14,7 @@ import type {
   SuggestionStrategy,
   Team,
 } from '@hockey/contracts';
-import { FORMATIONS, positionFit } from '@hockey/engine';
+import { FORMATIONS, minutesFromPlan, normaliseSubstitutions, positionFit } from '@hockey/engine';
 import { api, type LineupDraft } from '../../api-client';
 import { managedTeams } from '../../core/auth';
 import { Pitch } from '../../components/pitch/Pitch';
@@ -84,6 +84,8 @@ export function LineupPlanner({ me }: { me: Me }) {
   const [assignments, setAssignments] = useState<Assignments>({});
   const [locks, setLocks] = useState<Set<string>>(new Set());
   const [plan, setPlan] = useState<Plan | null>(null);
+  /** True once the manager has changed the suggested substitutions by hand. */
+  const [planEdited, setPlanEdited] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [newFormationOpen, setNewFormationOpen] = useState(false);
   /** Per formation: positions the team has saved, and positions dragged but not yet saved. */
@@ -124,6 +126,7 @@ export function LineupPlanner({ me }: { me: Me }) {
         locked: opts.locked,
       });
       setAssignments(toAssignments(result.starting));
+      setPlanEdited(false);
       setPlan({
         substitutions: result.substitutions,
         projectedMinutes: result.projectedMinutes,
@@ -199,6 +202,20 @@ export function LineupPlanner({ me }: { me: Me }) {
     if (!fixture) return;
     setAssignments(next);
     runSuggest({ fixtureId: fixture.id, formationId, strategy, locked: lockedAssignments(next) });
+  };
+
+  /** The manager edited the substitution plan: tidy it, recompute minutes, and keep their changes. */
+  const editPlan = (subs: Substitution[]) => {
+    if (!fixture || !formation || !plan) return;
+    const starting = formation.slots.map((s) => ({ slotId: s.id, memberId: assignments[s.id] ?? null }));
+    const { substitutions, dropped } = normaliseSubstitutions(starting, subs, fixture.durationMinutes);
+    setPlan({
+      ...plan,
+      substitutions,
+      projectedMinutes: minutesFromPlan(starting, substitutions, fixture.durationMinutes),
+    });
+    setPlanEdited(true);
+    if (dropped > 0) toast(`${dropped} change${dropped > 1 ? 's were' : ' was'} removed because it no longer made sense`);
   };
 
   const suggest = () => {
@@ -571,8 +588,14 @@ export function LineupPlanner({ me }: { me: Me }) {
             substitutions={plan?.substitutions ?? []}
             formation={formation}
             players={byId}
+            available={available}
+            starting={formation.slots.map((s) => ({ slotId: s.id, memberId: assignments[s.id] ?? null }))}
+            minutes={plan?.projectedMinutes ?? {}}
             periods={fixture.periods}
             durationMinutes={fixture.durationMinutes}
+            onChange={editPlan}
+            edited={planEdited}
+            onReset={() => replan(assignments)}
           />
           <MinutesPanel
             players={available}
