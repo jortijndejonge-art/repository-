@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SlotAssignment, Substitution } from '@hockey/contracts';
-import { minutesFromPlan, normaliseSubstitutions, onPitchBeforeChange } from '../src';
+import { minutesFromPlan, normaliseSubstitutions, onPitchBeforeChange, snapSubstitutions } from '../src';
 
 const starting: SlotAssignment[] = [
   { slotId: 'GK', memberId: 'gk' },
@@ -74,5 +74,23 @@ describe('onPitchBeforeChange', () => {
     const plan = [sub(20, 'LB', 'c', 'd'), sub(10, 'LB', 'a', 'c')]; // listed out of order
     expect([...onPitchBeforeChange(starting, plan, 0)].sort()).toEqual(['b', 'c', 'gk']); // before minute 20: c is in LB
     expect([...onPitchBeforeChange(starting, plan, 1)].sort()).toEqual(['a', 'b', 'gk']); // before minute 10: a is in LB
+  });
+});
+
+describe('snapSubstitutions', () => {
+  it('moves changes onto 5-minute marks without reordering them', () => {
+    const plan = [sub(8, 'LB', 'a', 'c'), sub(23, 'RB', 'b', 'd'), sub(38, 'LB', 'c', 'a')];
+    const { substitutions, dropped } = snapSubstitutions(starting, plan, 60);
+    expect(substitutions.map((s) => s.minute)).toEqual([10, 25, 40]);
+    expect(dropped).toBe(0);
+  });
+
+  it('keeps changes inside the match and the plan consistent', () => {
+    const plan = [sub(1, 'LB', 'a', 'c'), sub(59, 'RB', 'b', 'd')];
+    expect(snapSubstitutions(starting, plan, 60).substitutions.map((s) => s.minute)).toEqual([5, 55]);
+  });
+
+  it('leaves a match whose length is not a multiple of the step alone', () => {
+    expect(snapSubstitutions(starting, [sub(7, 'LB', 'a', 'c')], 42).substitutions.map((s) => s.minute)).toEqual([7]);
   });
 });

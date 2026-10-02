@@ -1,95 +1,46 @@
-/* Editable substitution plan */
-.subplan__tip {
+/* Substitution plan: the rotation chart */
+.rota__tip {
   margin: 0 0 10px;
 }
 
-/* Stays in view while you scroll a long plan, so a player can always be dragged onto a change. */
-.subplan__chips {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+.rota__scroll {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 0 4px 6px;
 }
 
-.subplan__chip {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-2);
-  font-size: 13px;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-
-.subplan--edit {
-  gap: 8px;
-}
-
-.subplan__edit-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 28px 1fr auto;
-  align-items: start;
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-2);
-}
-
-.subplan__edit-row.is-over {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 2px rgb(45 212 191 / 0.35);
-}
-
-.subplan__handle {
-  all: unset;
-  align-self: stretch;
-  display: grid;
-  place-items: center;
-  cursor: grab;
-  color: var(--text-muted);
-  font-size: 18px;
-  touch-action: none;
-  user-select: none;
-}
-
-.subplan__fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 8px;
-  min-width: 0;
-}
-
-.subplan__field {
+.rota {
+  --name-width: 78px;
+  --total-width: 30px;
+  /* Fits an ordinary match without scrolling; a long one scrolls sideways with the names staying put. */
+  min-width: calc(var(--name-width) + var(--cols) * 22px + var(--total-width) + 4px);
   display: flex;
   flex-direction: column;
+  gap: 3px;
+}
+
+.rota__row {
+  display: grid;
+  grid-template-columns: var(--name-width) repeat(var(--cols), minmax(20px, 1fr)) var(--total-width);
+  align-items: stretch;
   gap: 2px;
-  min-width: 0;
-  border-radius: 8px;
 }
 
-.subplan__field select {
-  min-height: 34px;
-  padding-top: 4px;
-  padding-bottom: 4px;
-  width: 100%;
+.rota__name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+  background: var(--surface);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.subplan__field--on.is-over select {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 2px rgb(45 212 191 / 0.45);
-}
-
-.subplan__field-label {
+.rota__row--head .rota__name {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -97,39 +48,172 @@
   color: var(--text-muted);
 }
 
-.subplan__field--on .subplan__field-label {
-  color: var(--green-ok);
-}
-
-.subplan__edit-row .subplan__off {
-  align-self: end;
-  font-size: 13px;
-  padding-bottom: 6px;
-}
-
-.subplan__edit-row .subplan__break {
-  grid-column: 2;
-}
-
-.subplan__remove {
-  all: unset;
-  cursor: pointer;
+.rota__time,
+.rota__total {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
   color: var(--text-muted);
-  padding: 2px 6px;
+  font-variant-numeric: tabular-nums;
 }
 
-.subplan__remove:hover {
-  color: var(--red);
+.rota__time--period {
+  color: var(--teal);
 }
 
-.subplan__actions {
+.rota__total {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.rota__row--head .rota__total {
+  color: var(--text-muted);
+}
+
+.rota__cell {
+  all: unset;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  min-height: 30px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: pan-x pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.rota__cell:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+}
+
+.rota__cell--bench {
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+}
+
+.rota__cell--GK {
+  background: rgb(240 180 41 / 0.28);
+  color: #f6cf6d;
+}
+
+.rota__cell--DEF {
+  background: rgb(45 212 191 / 0.24);
+  color: #7ee8da;
+}
+
+.rota__cell--MID {
+  background: rgb(90 169 255 / 0.26);
+  color: #9fcbff;
+}
+
+.rota__cell--FWD {
+  background: rgb(255 138 101 / 0.26);
+  color: #ffb199;
+}
+
+.rota__cell--locked {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rota__cell--period {
+  box-shadow: -3px 0 0 -1px var(--bg, #14181c);
+  margin-left: 2px;
+}
+
+.rota__cell.is-selected {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.rota__cell.is-over {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+  filter: brightness(1.4);
+}
+
+.rota__editor {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--teal);
+  border-radius: 10px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rota__editor p {
+  margin: 0;
+}
+
+.rota__editor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rota__editor-head .btn {
+  margin-left: auto;
+}
+
+.rota__chips {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rota__chip {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 14px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rota__chip:hover,
+.rota__chip:focus-visible {
+  border-color: var(--teal);
+  outline: none;
+}
+
+.rota__until {
+  display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.rota__until select {
+  min-height: 34px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.rota__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 12px;
 }
 
-.subplan__float {
+.rota__float {
   position: fixed;
   z-index: 50;
   transform: translate(12px, 12px);
@@ -141,10 +225,4 @@
   font-size: 13px;
   pointer-events: none;
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
-}
-
-@media (max-width: 520px) {
-  .subplan__fields {
-    grid-template-columns: 1fr;
-  }
 }

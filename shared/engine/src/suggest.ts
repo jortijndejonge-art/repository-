@@ -8,6 +8,7 @@ import type {
   SuggestionResult,
   SuggestionStrategy,
 } from '@hockey/contracts';
+import { minutesFromPlan, snapSubstitutions } from './subplan';
 
 export interface SuggestInput {
   /** Players available for this match (the caller filters on availability). */
@@ -255,13 +256,17 @@ export function suggestLineup(input: SuggestInput): SuggestionResult {
     }
   }
 
+  // Changes fall on 5-minute marks, so the plan lines up with the rotation chart and is easy to read and edit.
+  const startingSlots = formation.slots.map((s) => ({ slotId: s.id, memberId: starting.get(s.id) ?? null }));
+  const snapped = snapSubstitutions(startingSlots, substitutions, durationMinutes).substitutions;
+  const playedMinutes = minutesFromPlan(startingSlots, snapped, durationMinutes);
   const projectedMinutes: Record<Id, number> = {};
-  for (const [id, mins] of played) projectedMinutes[id] = Math.round(mins);
+  for (const id of played.keys()) projectedMinutes[id] = playedMinutes[id] ?? 0;
 
   return {
-    starting: formation.slots.map((s) => ({ slotId: s.id, memberId: starting.get(s.id) ?? null })),
+    starting: startingSlots,
     bench,
-    substitutions,
+    substitutions: snapped,
     projectedMinutes,
     warnings,
   };

@@ -32,6 +32,25 @@ export function normaliseSubstitutions(
   return { substitutions: kept, dropped: subs.length - kept.length };
 }
 
+/**
+ * Put every change on a whole-`step`-minute mark (default 5), so the plan lines up with the rotation chart.
+ * Rounding keeps the order of changes, so nothing becomes invalid; if the match isn't a multiple of the step
+ * long, the plan is left alone.
+ */
+export function snapSubstitutions(
+  starting: SlotAssignment[],
+  subs: Substitution[],
+  durationMinutes: number,
+  step = 5,
+): { substitutions: Substitution[]; dropped: number } {
+  if (durationMinutes % step !== 0 || durationMinutes < step * 2) return normaliseSubstitutions(starting, subs, durationMinutes);
+  const snapped = subs.map((s) => ({
+    ...s,
+    minute: Math.min(durationMinutes - step, Math.max(step, Math.round(s.minute / step) * step)),
+  }));
+  return normaliseSubstitutions(starting, snapped, durationMinutes);
+}
+
 /** Whole minutes each player is on the pitch for, for a (normalised) plan. Players who never play are left out. */
 export function minutesFromPlan(starting: SlotAssignment[], subs: Substitution[], durationMinutes: number): Record<Id, number> {
   const events = inTimeOrder(subs).map((s) => ({

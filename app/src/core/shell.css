@@ -17,9 +17,18 @@
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--border);
+  /* Many tabs: scroll sideways inside the bar instead of widening the whole page on a phone. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tabs button {
+  flex: none;
+  white-space: nowrap;
   border: 0;
   background: none;
   padding: 10px 14px;
