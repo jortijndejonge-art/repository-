@@ -5,6 +5,7 @@ import { ToastProvider } from './core/Toast';
 import { SignIn } from './screens/auth/SignIn';
 import { Verify } from './screens/auth/Verify';
 import { MyMatches } from './screens/availability/MyMatches';
+import { Calendar } from './screens/calendar/Calendar';
 import { Fixtures } from './screens/fixtures/Fixtures';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
 import { Account } from './screens/account/Account';
@@ -46,7 +47,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'matches' | 'lineup' | 'squad' | 'fixtures' | 'training' | 'membership' | 'account';
+type Tab = 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'training' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -56,6 +57,7 @@ function Shell({ me }: { me: Me }) {
   const returningFromPayment = new URLSearchParams(location.search).has('payment');
   const [tab, setTab] = useState<Tab>(returningFromPayment ? 'membership' : canManage ? 'lineup' : 'matches');
   const tabs: { id: Tab; label: string }[] = [
+    ...(me.teams.length > 0 ? [{ id: 'calendar' as const, label: 'Calendar' }] : []),
     ...(plays ? [{ id: 'matches' as const, label: 'My matches' }] : []),
     ...(canManage ? [{ id: 'lineup' as const, label: 'Lineup planner' }] : []),
     ...(canManage ? [{ id: 'fixtures' as const, label: 'Fixtures' }] : []),
@@ -103,6 +105,7 @@ function Shell({ me }: { me: Me }) {
       {tab === 'fixtures' && canManage && <Fixtures me={me} />}
       {tab === 'training' && <Training me={me} />}
       {tab === 'squad' && canManage && <Squad me={me} />}
+      {tab === 'calendar' && <Calendar me={me} />}
       {tab === 'matches' && <MyMatches me={me} />}
       {tab === 'membership' && <Membership me={me} />}
       {tab === 'account' && <Account me={me} />}
