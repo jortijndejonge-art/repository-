@@ -27,9 +27,15 @@ const CHOICES: { status: AvailabilityStatus; label: string }[] = [
 
 const byStart = (a: TrainingSession, b: TrainingSession) => a.startsAt.localeCompare(b.startsAt);
 
-export function Training({ me }: { me: Me }) {
+/** Whose training to show: you by default, or a child you are the guardian of. */
+export interface TrainingSubject {
+  memberId: Id;
+  teams: Team[];
+}
+
+export function Training({ me, subject }: { me: Me; subject?: TrainingSubject }) {
   const manages = managedTeams(me).length > 0;
-  return manages ? <ManagerView me={me} /> : <PlayerView me={me} />;
+  return manages && !subject ? <ManagerView me={me} /> : <PlayerView me={me} subject={subject} />;
 }
 
 /* ---------------------------------------------------------------- manager */
@@ -202,7 +208,8 @@ interface SessionCard {
   responses: TrainingResponse[];
 }
 
-function PlayerView({ me }: { me: Me }) {
+function PlayerView({ me, subject }: { me: Me; subject?: TrainingSubject }) {
+  const memberId = subject?.memberId ?? me.member.id;
   const toast = useToast();
   const [cards, setCards] = useState<SessionCard[] | null>(null);
 
@@ -211,7 +218,7 @@ function PlayerView({ me }: { me: Me }) {
     (async () => {
       const from = new Date(Date.now() - 3 * 3600_000).toISOString();
       const perTeam = await Promise.all(
-        playingTeams(me).map(async (team) => {
+        (subject?.teams ?? playingTeams(me)).map(async (team) => {
           const sessions = await api.getTrainingSessions(team.id, from);
           return Promise.all(
             sessions.map(async (session) => ({ team, session, responses: await api.getTrainingResponses(session.id) })),
@@ -223,11 +230,11 @@ function PlayerView({ me }: { me: Me }) {
     return () => {
       cancelled = true;
     };
-  }, [me, toast]);
+  }, [me, subject, toast]);
 
   const respond = async (card: SessionCard, status: AvailabilityStatus) => {
     try {
-      await api.setTrainingRsvp(card.session.id, me.member.id, status);
+      await api.setTrainingRsvp(card.session.id, memberId, status);
     } catch {
       toast('Could not save your answer');
       return;
@@ -236,7 +243,7 @@ function PlayerView({ me }: { me: Me }) {
       (cur) =>
         cur?.map((c) =>
           c.session.id === card.session.id
-            ? { ...c, responses: c.responses.map((r) => (r.memberId === me.member.id ? { ...r, rsvp: status } : r)) }
+            ? { ...c, responses: c.responses.map((r) => (r.memberId === memberId ? { ...r, rsvp: status } : r)) }
             : c,
         ) ?? cur,
     );
@@ -249,7 +256,7 @@ function PlayerView({ me }: { me: Me }) {
     <div className="training__player">
       {cards.length === 0 && <p className="muted">No upcoming training for your teams.</p>}
       {cards.map((card) => {
-        const mine = card.responses.find((r) => r.memberId === me.member.id)?.rsvp ?? 'no_response';
+        const mine = card.responses.find((r) => r.memberId === memberId)?.rsvp ?? 'no_response';
         const coming = card.responses.filter((r) => r.rsvp === 'available').length;
         return (
           <article key={card.session.id} className="match">

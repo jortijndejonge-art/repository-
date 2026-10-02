@@ -3,6 +3,7 @@ import type {
   AvailabilityStatus,
   Club,
   Announcement,
+  GuardianSummary,
   NewAnnouncement,
   Fixture,
   TrainingResponse,
@@ -17,6 +18,7 @@ import type {
   Id,
   Lineup,
   Member,
+  Role,
   MembershipPlan,
   NewMembershipPlan,
   MembershipRecord,
@@ -82,6 +84,16 @@ export interface Repository {
   deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
+
+  // Guardians
+  /** The children (members with a player profile) this guardian looks after, with the teams they play for. */
+  listChildren(guardianId: Id): Promise<{ memberId: Id; displayName: string; teamIds: Id[] }[]>;
+  listGuardians(childId: Id): Promise<GuardianSummary[]>;
+  isGuardianOf(guardianId: Id, childId: Id): Promise<boolean>;
+  addGuardian(childId: Id, guardianId: Id): Promise<void>;
+  createMember(clubId: Id, member: { firstName: string; lastName: string; email: string }): Promise<Member>;
+  /** Gives a member a role on a team, keeping any roles they already have there. */
+  addTeamRole(teamId: Id, memberId: Id, role: Role): Promise<void>;
 
   // Announcements
   listAnnouncements(teamId: Id): Promise<Announcement[]>;
@@ -448,6 +460,66 @@ export class PgRepository implements Repository {
       toAvailability,
     );
     return row!;
+  }
+
+  async listChildren(guardianId: Id) {
+    const { rows } = await this.pool.query(
+      `SELECT p.member_id, p.display_name,
+              COALESCE(array_agg(tm.team_id) FILTER (WHERE tm.team_id IS NOT NULL), '{}') AS team_ids
+         FROM guardianships g
+         JOIN player_profiles p ON p.member_id = g.child_id
+         LEFT JOIN team_memberships tm ON tm.member_id = g.child_id AND 'player' = ANY (tm.roles)
+        WHERE g.guardian_id = $1
+        GROUP BY p.member_id, p.display_name
+        ORDER BY p.display_name`,
+      [guardianId],
+    );
+    return rows.map((r) => ({ memberId: r.member_id as Id, displayName: r.display_name as string, teamIds: r.team_ids as Id[] }));
+  }
+
+  listGuardians(childId: Id) {
+    return this.many(
+      `SELECT m.* FROM guardianships g JOIN members m ON m.id = g.guardian_id WHERE g.child_id = $1 ORDER BY m.first_name`,
+      [childId],
+      (r) => ({
+        memberId: r.id as Id,
+        firstName: r.first_name as string,
+        lastName: r.last_name as string,
+        ...(r.email ? { email: r.email as string } : {}),
+      }),
+    );
+  }
+
+  async isGuardianOf(guardianId: Id, childId: Id) {
+    const { rowCount } = await this.pool.query('SELECT 1 FROM guardianships WHERE guardian_id = $1 AND child_id = $2', [
+      guardianId,
+      childId,
+    ]);
+    return (rowCount ?? 0) > 0;
+  }
+
+  async addGuardian(childId: Id, guardianId: Id) {
+    await this.pool.query('INSERT INTO guardianships (guardian_id, child_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [
+      guardianId,
+      childId,
+    ]);
+  }
+
+  async createMember(clubId: Id, m: { firstName: string; lastName: string; email: string }) {
+    const { rows } = await this.pool.query(
+      'INSERT INTO members (club_id, first_name, last_name, email) VALUES ($1, $2, $3, lower($4)) RETURNING *',
+      [clubId, m.firstName, m.lastName, m.email.trim()],
+    );
+    return toMember(rows[0]);
+  }
+
+  async addTeamRole(teamId: Id, memberId: Id, role: Role) {
+    await this.pool.query(
+      `INSERT INTO team_memberships (team_id, member_id, roles) VALUES ($1, $2, ARRAY[$3]::text[])
+       ON CONFLICT (team_id, member_id) DO UPDATE
+         SET roles = ARRAY(SELECT DISTINCT unnest(team_memberships.roles || EXCLUDED.roles))`,
+      [teamId, memberId, role],
+    );
   }
 
   listAnnouncements(teamId: Id) {

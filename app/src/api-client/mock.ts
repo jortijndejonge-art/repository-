@@ -1,4 +1,4 @@
-import type { Announcement, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { Announcement, GuardianSummary, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -13,6 +13,7 @@ export function createMockClient(): ApiClient {
   const lineups = new Map<Id, Lineup>();
   const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
   const announcements: Announcement[] = [];
+  const guardians = new Map<string, GuardianSummary[]>();
   const trainingSessions: TrainingSession[] = [];
   const trainingResponses = new Map<string, TrainingResponse>();
   const plans: MembershipPlan[] = demo.membershipPlans.map((p) => ({ ...p }));
@@ -45,7 +46,7 @@ export function createMockClient(): ApiClient {
     if (!member) throw new ApiError(401, 'Sign in required');
     const memberships = demo.memberships.filter((m) => m.memberId === id);
     const teams = demo.teams.filter((t) => memberships.some((m) => m.teamId === t.id));
-    return { member, club: demo.club, memberships, teams };
+    return { member, club: demo.club, memberships, teams, children: [] };
   }
 
   return {
@@ -129,6 +130,21 @@ export function createMockClient(): ApiClient {
       if (at >= 0) myMemberships[at] = record;
       else myMemberships.push(record);
       return delay({ demo: true });
+    },
+    async getGuardians(_teamId, childId) {
+      return delay((guardians.get(childId) ?? []).map((g) => ({ ...g })));
+    },
+    async addGuardian(_teamId, childId, input) {
+      const list = guardians.get(childId) ?? [];
+      const existing = list.find((g) => g.email === input.email.trim().toLowerCase());
+      const guardian: GuardianSummary = existing ?? {
+        memberId: `parent-${Date.now().toString(36)}`,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email.trim().toLowerCase(),
+      };
+      if (!existing) guardians.set(childId, [...list, guardian]);
+      return delay({ guardian: { ...guardian }, ...(existing ? {} : { password: 'demo-password-123' }) });
     },
     async getAnnouncements(teamId) {
       return delay(

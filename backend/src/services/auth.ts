@@ -1,4 +1,4 @@
-import type { AuthSession, Id, Me } from '@hockey/contracts';
+import type { AuthSession, GuardianSummary, Id, Me, NewGuardian } from '@hockey/contracts';
 import type { Config } from '../config';
 import type { Repository } from '../db/repository';
 import { hashToken, newToken } from '../auth/tokens';
@@ -129,6 +129,31 @@ export class AuthService {
     return { email: address.toLowerCase(), password };
   }
 
+  /**
+   * A manager links a parent to a player. The parent is created from the details if they are new to
+   * the club, and gets the guardian role on the child's team. A new parent also gets a first password.
+   */
+  async addGuardian(teamId: Id, childId: Id, input: NewGuardian): Promise<{ guardian: GuardianSummary; password?: string }> {
+    const child = await this.repo.getMember(childId);
+    if (!child) throw notFound('Player not found');
+    const email = input.email.trim();
+    if (!email.includes('@')) throw badRequest('Enter a valid email address');
+    let guardian = (await this.repo.findMembersByEmail(email)).find((m) => m.clubId === child.clubId);
+    if (guardian?.id === childId) throw badRequest('A player cannot be their own guardian');
+    guardian ??= await this.repo.createMember(child.clubId, { firstName: input.firstName.trim(), lastName: input.lastName.trim(), email });
+    await this.repo.addTeamRole(teamId, guardian.id, 'guardian');
+    await this.repo.addGuardian(childId, guardian.id);
+    let password: string | undefined;
+    if (!(await this.repo.getPasswordHash(guardian.id))) {
+      password = generatePassword();
+      await this.repo.setPasswordHash(guardian.id, await hashPassword(password));
+    }
+    return {
+      guardian: { memberId: guardian.id, firstName: guardian.firstName, lastName: guardian.lastName, email: guardian.email },
+      ...(password ? { password } : {}),
+    };
+  }
+
   /** Used by the set-password command: returns the password that was set. */
   async setPasswordForEmail(email: string, password = generatePassword()): Promise<string> {
     const [member] = await this.repo.findMembersByEmail(email);
@@ -165,6 +190,13 @@ export class AuthService {
     const teams = (await Promise.all(memberships.map((m) => this.repo.getTeam(m.teamId)))).filter(
       (t) => t !== null,
     );
-    return { member, club: club!, memberships, teams };
+    const children = await Promise.all(
+      (await this.repo.listChildren(memberId)).map(async (c) => ({
+        memberId: c.memberId,
+        displayName: c.displayName,
+        teams: (await Promise.all(c.teamIds.map((id) => this.repo.getTeam(id)))).filter((t) => t !== null),
+      })),
+    );
+    return { member, club: club!, memberships, teams, children };
   }
 }

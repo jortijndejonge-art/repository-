@@ -28,7 +28,14 @@ function kickoff(iso: string) {
   });
 }
 
-export function MyMatches({ me }: { me: Me }) {
+/** Whose matches to show: you by default, or a child you are the guardian of. */
+export interface Subject {
+  memberId: string;
+  teams: Team[];
+}
+
+export function MyMatches({ me, subject }: { me: Me; subject?: Subject }) {
+  const memberId = subject?.memberId ?? me.member.id;
   const toast = useToast();
   const [cards, setCards] = useState<MatchCard[] | null>(null);
 
@@ -37,7 +44,7 @@ export function MyMatches({ me }: { me: Me }) {
     (async () => {
       // Include matches that kicked off in the last few hours.
       const from = new Date(Date.now() - 3 * 3600_000).toISOString();
-      const teams = playingTeams(me);
+      const teams = subject?.teams ?? playingTeams(me);
       const perTeam = await Promise.all(
         teams.map(async (team) => {
           const fixtures = await api.getFixtures(team.id, from);
@@ -59,16 +66,16 @@ export function MyMatches({ me }: { me: Me }) {
     return () => {
       cancelled = true;
     };
-  }, [me]);
+  }, [me, subject]);
 
   const respond = async (card: MatchCard, status: AvailabilityStatus) => {
-    const updated = await api.setAvailability(card.fixture.id, me.member.id, status);
+    const updated = await api.setAvailability(card.fixture.id, memberId, status);
     setCards((prev) =>
       prev!.map((c) =>
         c.fixture.id === card.fixture.id
           ? {
               ...c,
-              availability: [...c.availability.filter((a) => a.memberId !== me.member.id), updated],
+              availability: [...c.availability.filter((a) => a.memberId !== memberId), updated],
             }
           : c,
       ),
@@ -82,11 +89,11 @@ export function MyMatches({ me }: { me: Me }) {
     <div className="matches">
       {cards.length === 0 && <p className="muted">No upcoming matches for your teams.</p>}
       {cards.map((card) => {
-        const mine = card.availability.find((a) => a.memberId === me.member.id)?.status ?? 'no_response';
+        const mine = card.availability.find((a) => a.memberId === memberId)?.status ?? 'no_response';
         const confirmed = card.availability.filter((a) => a.status === 'available').length;
         const needed = card.fixture.format;
-        const slot = card.lineup?.sharedAt ? card.lineup.starting.find((s) => s.memberId === me.member.id) : undefined;
-        const onBench = card.lineup?.sharedAt && card.lineup.bench.includes(me.member.id);
+        const slot = card.lineup?.sharedAt ? card.lineup.starting.find((s) => s.memberId === memberId) : undefined;
+        const onBench = card.lineup?.sharedAt && card.lineup.bench.includes(memberId);
         return (
           <article key={card.fixture.id} className="match">
             <header className="match__head">

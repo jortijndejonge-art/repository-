@@ -96,6 +96,8 @@ export function Squad({ me }: { me: Me }) {
           onCreateLogin={
             dialog.player ? (email) => api.createPlayerLogin(teamId, dialog.player!.memberId, email) : undefined
           }
+          onLoadGuardians={dialog.player ? () => api.getGuardians(teamId, dialog.player!.memberId) : undefined}
+          onAddGuardian={dialog.player ? (g) => api.addGuardian(teamId, dialog.player!.memberId, g) : undefined}
         />
       )}
     </section>

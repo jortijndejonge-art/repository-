@@ -7,6 +7,7 @@ import { Verify } from './screens/auth/Verify';
 import { MyMatches } from './screens/availability/MyMatches';
 import { Announcements } from './screens/announcements/Announcements';
 import { Calendar } from './screens/calendar/Calendar';
+import { Family } from './screens/family/Family';
 import { Fixtures } from './screens/fixtures/Fixtures';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
 import { Account } from './screens/account/Account';
@@ -48,7 +49,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'training' | 'membership' | 'account';
+type Tab = 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'training' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -56,8 +57,11 @@ function Shell({ me }: { me: Me }) {
   const plays = playingTeams(me).length > 0;
   // Coming back from the payment page lands on the Membership tab.
   const returningFromPayment = new URLSearchParams(location.search).has('payment');
-  const [tab, setTab] = useState<Tab>(returningFromPayment ? 'membership' : canManage ? 'lineup' : 'matches');
+  const [tab, setTab] = useState<Tab>(
+    returningFromPayment ? 'membership' : canManage ? 'lineup' : me.children.length > 0 && !plays ? 'family' : 'matches',
+  );
   const tabs: { id: Tab; label: string }[] = [
+    ...(me.children.length > 0 ? [{ id: 'family' as const, label: 'My children' }] : []),
     ...(me.teams.length > 0 ? [{ id: 'announcements' as const, label: 'Announcements' }] : []),
     ...(me.teams.length > 0 ? [{ id: 'calendar' as const, label: 'Calendar' }] : []),
     ...(plays ? [{ id: 'matches' as const, label: 'My matches' }] : []),
@@ -107,12 +111,13 @@ function Shell({ me }: { me: Me }) {
       {tab === 'fixtures' && canManage && <Fixtures me={me} />}
       {tab === 'training' && <Training me={me} />}
       {tab === 'squad' && canManage && <Squad me={me} />}
+      {tab === 'family' && <Family me={me} />}
       {tab === 'announcements' && <Announcements me={me} />}
       {tab === 'calendar' && <Calendar me={me} />}
       {tab === 'matches' && <MyMatches me={me} />}
       {tab === 'membership' && <Membership me={me} />}
       {tab === 'account' && <Account me={me} />}
-      {!plays && !canManage && <p className="muted">You're not in any teams yet — ask your club to add you.</p>}
+      {!plays && !canManage && me.children.length === 0 && <p className="muted">You're not in any teams yet — ask your club to add you.</p>}
     </div>
   );
 }

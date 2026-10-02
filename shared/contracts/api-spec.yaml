@@ -268,6 +268,37 @@ paths:
         '400': { description: No email address for this player }
         '409': { description: Email already used by someone else in the club }
 
+  /teams/{teamId}/players/{memberId}/guardians:
+    parameters:
+      - { $ref: '#/components/parameters/teamId' }
+      - { $ref: '#/components/parameters/memberId' }
+    get:
+      summary: A player's parents/guardians (manager/admin)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/GuardianSummary' } }
+    post:
+      summary: Link a parent to a player, creating the parent if needed (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewGuardian' }
+      responses:
+        '201':
+          description: Linked. A new parent also gets a first password, shown once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [guardian]
+                properties:
+                  guardian: { $ref: '#/components/schemas/GuardianSummary' }
+                  password: { type: string }
+
   /teams/{teamId}/fixtures:
     parameters: [{ $ref: '#/components/parameters/teamId' }]
     post:
@@ -695,6 +726,23 @@ components:
         format: { $ref: '#/components/schemas/SquadFormat' }
         durationMinutes: { type: integer }
         periods: { type: integer }
+
+    GuardianSummary:
+      type: object
+      required: [memberId, firstName, lastName]
+      properties:
+        memberId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+
+    NewGuardian:
+      type: object
+      required: [firstName, lastName, email]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
 
     Announcement:
       type: object

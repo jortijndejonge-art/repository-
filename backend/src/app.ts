@@ -6,6 +6,7 @@ import type {
   Lineup,
   NewCustomFormation,
   NewAnnouncement,
+  NewGuardian,
   NewFixture,
   NewTrainingSession,
   TrainingSessionUpdate,
@@ -203,6 +204,38 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
           const squad = await repo.listTeamPlayers(req.params.teamId);
           if (!squad.some((p) => p.memberId === req.params.memberId)) throw notFound('Player not in this team');
           return auth.createPlayerLogin(req.params.memberId, req.body?.email);
+        },
+      );
+
+      api.get<{ Params: { teamId: Id; memberId: Id } }>('/teams/:teamId/players/:memberId/guardians', async (req) => {
+        await access.requireManager(await signedIn(req), req.params.teamId);
+        const squad = await repo.listTeamPlayers(req.params.teamId);
+        if (!squad.some((p) => p.memberId === req.params.memberId)) throw notFound('Player not in this team');
+        return repo.listGuardians(req.params.memberId);
+      });
+
+      api.post<{ Params: { teamId: Id; memberId: Id }; Body: NewGuardian }>(
+        '/teams/:teamId/players/:memberId/guardians',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['firstName', 'lastName', 'email'],
+              additionalProperties: false,
+              properties: {
+                firstName: { type: 'string', minLength: 1, maxLength: 80 },
+                lastName: { type: 'string', minLength: 1, maxLength: 80 },
+                email: { type: 'string', minLength: 3, maxLength: 320 },
+              },
+            },
+          },
+        },
+        async (req, reply) => {
+          await access.requireManager(await signedIn(req), req.params.teamId);
+          const squad = await repo.listTeamPlayers(req.params.teamId);
+          if (!squad.some((p) => p.memberId === req.params.memberId)) throw notFound('Player not in this team');
+          reply.code(201);
+          return auth.addGuardian(req.params.teamId, req.params.memberId, req.body);
         },
       );
 

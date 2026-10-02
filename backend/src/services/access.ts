@@ -50,9 +50,10 @@ export class Access {
     }
   }
 
-  /** A member can manage their own record; managers of any of their teams can too. */
+  /** A member can manage their own record; so can their guardians and the managers of their team. */
   async requireCanActFor(actorId: Id, memberId: Id, teamId: Id) {
     if (actorId === memberId) return;
+    if (await this.repo.isGuardianOf(actorId, memberId)) return;
     await this.requireManager(actorId, teamId);
   }
 }

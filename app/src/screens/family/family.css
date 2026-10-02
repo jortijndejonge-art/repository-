@@ -1,0 +1,25 @@
+.family {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.family__name {
+  margin: 0;
+  font-size: 20px;
+}
+
+.family__heading {
+  margin: 8px 0 0;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.family p {
+  margin: 0;
+}

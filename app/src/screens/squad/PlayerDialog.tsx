@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { NewPlayer, PlayerProfile, PositionLine } from '@hockey/contracts';
+import type { GuardianSummary, NewGuardian, NewPlayer, PlayerProfile, PositionLine } from '@hockey/contracts';
 
 const LINES: { id: PositionLine; label: string }[] = [
   { id: 'GK', label: 'Goalkeeper' },
@@ -15,9 +15,12 @@ interface PlayerDialogProps {
   onSave: (player: NewPlayer) => Promise<void>;
   /** Editing only: create a sign-in for this player; resolves with the details to hand over. */
   onCreateLogin?: (email?: string) => Promise<{ email: string; password: string }>;
+  /** Editing only: this player's parents/guardians, and linking another one. */
+  onLoadGuardians?: () => Promise<GuardianSummary[]>;
+  onAddGuardian?: (guardian: NewGuardian) => Promise<{ guardian: GuardianSummary; password?: string }>;
 }
 
-export function PlayerDialog({ player, onCancel, onSave, onCreateLogin }: PlayerDialogProps) {
+export function PlayerDialog({ player, onCancel, onSave, onCreateLogin, onLoadGuardians, onAddGuardian }: PlayerDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -30,6 +33,12 @@ export function PlayerDialog({ player, onCancel, onSave, onCreateLogin }: Player
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const editing = Boolean(player);
+  const [guardians, setGuardians] = useState<GuardianSummary[] | null>(null);
+  const [gFirst, setGFirst] = useState('');
+  const [gLast, setGLast] = useState('');
+  const [gEmail, setGEmail] = useState('');
+  const [gResult, setGResult] = useState<{ email: string; password?: string } | null>(null);
+  const [gError, setGError] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState('');
   const [login, setLogin] = useState<{ email: string; password: string } | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -60,6 +69,29 @@ Password: ${login.password}`);
   useEffect(() => {
     ref.current?.showModal();
   }, []);
+
+  useEffect(() => {
+    onLoadGuardians?.()
+      .then(setGuardians)
+      .catch(() => setGuardians([]));
+    // Loaded once, when the dialog opens for this player.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const addGuardian = async () => {
+    setGError(null);
+    setGResult(null);
+    try {
+      const res = await onAddGuardian!({ firstName: gFirst.trim(), lastName: gLast.trim(), email: gEmail.trim() });
+      setGuardians((cur) => (cur?.some((g) => g.memberId === res.guardian.memberId) ? cur : [...(cur ?? []), res.guardian]));
+      setGResult({ email: res.guardian.email ?? gEmail.trim(), password: res.password });
+      setGFirst('');
+      setGLast('');
+      setGEmail('');
+    } catch (e) {
+      setGError(e instanceof Error ? e.message : 'Could not add the parent');
+    }
+  };
 
   /** Order matters: the first line ticked is the player's preferred one. */
   const toggle = (line: PositionLine) =>
@@ -159,6 +191,67 @@ Password: ${login.password}`);
           {loginError && (
             <p className="squad-error" role="alert">
               {loginError}
+            </p>
+          )}
+        </div>
+      )}
+      {editing && onAddGuardian && (
+        <div className="squad-login">
+          <span className="field__label">Parents and guardians</span>
+          {guardians && guardians.length > 0 ? (
+            <ul className="squad-guardians">
+              {guardians.map((g) => (
+                <li key={g.memberId}>
+                  {g.firstName} {g.lastName}
+                  {g.email ? <span className="muted small"> · {g.email}</span> : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="muted small">{guardians ? 'None linked yet.' : 'Loading…'}</span>
+          )}
+          <div className="fixture-form__row">
+            <label className="field">
+              <span className="muted small">First name</span>
+              <input value={gFirst} maxLength={80} onChange={(e) => setGFirst(e.target.value)} />
+            </label>
+            <label className="field">
+              <span className="muted small">Last name</span>
+              <input value={gLast} maxLength={80} onChange={(e) => setGLast(e.target.value)} />
+            </label>
+          </div>
+          <label className="field">
+            <span className="muted small">Email (an existing parent is found by their email)</span>
+            <input type="email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="btn"
+            disabled={gFirst.trim() === '' || gLast.trim() === '' || !gEmail.includes('@')}
+            onClick={addGuardian}
+          >
+            Link parent
+          </button>
+          {gResult && (
+            <div className="squad-login__result" role="status">
+              <div>
+                Linked <strong>{gResult.email}</strong>
+              </div>
+              {gResult.password ? (
+                <>
+                  <div>
+                    First password: <strong>{gResult.password}</strong>
+                  </div>
+                  <p className="muted small">Shown once. They can change it in Account.</p>
+                </>
+              ) : (
+                <p className="muted small">They already have a sign-in, so their password is unchanged.</p>
+              )}
+            </div>
+          )}
+          {gError && (
+            <p className="squad-error" role="alert">
+              {gError}
             </p>
           )}
         </div>

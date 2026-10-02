@@ -1,4 +1,6 @@
 import type {
+  GuardianSummary,
+  NewGuardian,
   Announcement,
   NewAnnouncement,
   Availability,
@@ -61,6 +63,9 @@ export interface ApiClient {
   addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
   updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
   deleteFixture(fixtureId: Id): Promise<void>;
+  getGuardians(teamId: Id, childId: Id): Promise<GuardianSummary[]>;
+  /** Links a parent to a player; a brand-new parent also comes back with a first password, shown once. */
+  addGuardian(teamId: Id, childId: Id, guardian: NewGuardian): Promise<{ guardian: GuardianSummary; password?: string }>;
   getAnnouncements(teamId: Id): Promise<Announcement[]>;
   postAnnouncement(teamId: Id, announcement: NewAnnouncement): Promise<Announcement>;
   deleteAnnouncement(announcementId: Id): Promise<void>;

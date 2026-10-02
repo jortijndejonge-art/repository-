@@ -85,11 +85,35 @@ export interface NewPlayer {
 export type PlayerProfileUpdate = Partial<Omit<PlayerProfile, 'memberId'>>;
 
 /** The signed-in member with everything the app needs to start. */
+/** A child a guardian looks after, with the teams they play for. */
+export interface ChildSummary {
+  memberId: Id;
+  displayName: string;
+  teams: Team[];
+}
+
 export interface Me {
   member: Member;
   club: Club;
   memberships: TeamMembership[];
   teams: Team[];
+  /** Children this member is a guardian of (empty for most people). */
+  children: ChildSummary[];
+}
+
+/** A parent or guardian as a manager sees them next to a player. */
+export interface GuardianSummary {
+  memberId: Id;
+  firstName: string;
+  lastName: string;
+  email?: string;
+}
+
+/** Linking a parent to a player; the parent is created from these details if they are new to the club. */
+export interface NewGuardian {
+  firstName: string;
+  lastName: string;
+  email: string;
 }
 
 export interface AuthSession {
