@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0016**
+Next free id: **BL-0017**
 
 ---
+
+## BL-0016 — Season stats: attendance, availability and minutes
+- **Date:** 2026-10-02
+- **Source task:** Phase 2 (attendance tracking across matches and training)
+- **Idea:** A Stats tab where a manager sees, per player, training sessions attended out of the past sessions where attendance was recorded, matches they said they were available for out of those already played, and minutes played from finished live matches. Sortable; minutes shown as a bar so uneven playing time stands out.
+- **Rationale:** Master plan Phase 2, and it makes the fair-playing-time idea visible across the season.
+- **Effort estimate:** M
+- **Owning agent:** A/B (stats query, route), C (Stats screen)
+- **Status:** Approved — owner commissioned this directly ("continue").
+- **Outcome (2026-10-02):** Done, committed in 5f9da6a and live. Verified on the live site with throwaway past sessions: only past sessions with recorded attendance count, future and unrecorded ones don't, and parents get a 403. Not built yet: a player or parent seeing their own attendance, stats across a whole season boundary (there is no season concept yet), and stats across all of a manager's teams at once.
 
 ## BL-0015 — Pre-match briefings with read receipts
 - **Date:** 2026-10-02
