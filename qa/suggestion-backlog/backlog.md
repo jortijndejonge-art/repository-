@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0014**
+Next free id: **BL-0015**
 
 ---
+
+## BL-0014 — Live matchday: clock, substitutions and minutes played
+- **Date:** 2026-10-02
+- **Source task:** Phase 3 (live matchday mode: real-time substitutions, automatic minutes-on-pitch tracking)
+- **Idea:** A Matchday tab where a manager starts the match clock, pauses and resumes it, makes substitutions (planned ones are offered when due, or any manual swap), and finishes the match. Finishing adds each player's minutes to their season total, once, which feeds the fair-playing-time suggestions.
+- **Rationale:** Master plan Phase 3. The clock and changes are stored on the server, so a phone dying or a second device doesn't lose the match.
+- **Effort estimate:** L
+- **Owning agent:** A/B (migration 009, live service, routes), C (Matchday screen), shared engine (minutes maths)
+- **Status:** Approved — owner commissioned this directly ("please continue").
+- **Outcome (2026-10-02):** Done, committed in 20e273b and live. 7 service tests, 9 engine tests, and a live end-to-end run (start refused without a lineup, change recorded, repeat refused, pause, finish, no changes after). Built as lists, not on the pitch diagram, because the pitch screen is frozen. Not built yet: players or parents watching a match live, goals and score, and period (quarter) markers on the clock.
 
 ## BL-0013 — Parent layer: link parents to players, answer for their children
 - **Date:** 2026-10-02
