@@ -34,9 +34,30 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0018**
+Next free id: **BL-0019**
 
 ---
+
+## BL-0018 — Flexible substitutions with drag and drop (rebuild of BL-0017, owner priority: top)
+- **Date:** 2026-10-02
+- **Source task:** D4 (bench and planned substitutions); owner: "implement flexible substitutions with drag and drop so this is super easy, currently it doesn't really work, review yourself"
+- **Idea:** Replace the list-of-changes editor with a rotation chart. One row per player, one column per 5-minute block, each cell showing the position that player holds then (or blank on the bench) and a total of minutes at the end of the row. Change anything by dragging one player's cell onto another player's cell, or by tapping a cell and tapping who to swap with. The chart can never become inconsistent, so nothing is greyed out or refused for confusing reasons.
+- **Rationale:** Owner feedback. Review of BL-0017 on the real screen found:
+  1. The Minute and Position menus are squashed to unreadable slivers in the side column, with the labels overlapping. The main controls could not be read. I only tested the DOM, never looked at the screen.
+  2. Almost every choice is greyed out (about 15 of 39 minutes, and 1 position and 1 player per change), so the editor is mostly locked. "Flexible" fails.
+  3. Changes depend on each other (a player can't come on before they have gone off), so one edit often has to be refused, and the refusal message does not say what to do.
+  4. 16 rows of three menus is about 1,800 px tall, so you cannot see the whole rotation at once, which is how coaches think about it.
+  5. The drag handles are tiny, the targets are menus, and what a drop will do is not obvious.
+- **Effort estimate:** L
+- **Owning agent:** D (plan card), shared engine (rotation maths)
+- **Status:** Approved — owner commissioned this directly; this is the top priority.
+- **Outcome (2026-10-02):** Done, committed in 62c0d85 and live.
+  - **How it works:** a rotation chart with a row per player and a column per 5 minutes; each cell shows the position held then, blank on the bench, with a minutes total per row. Tap a cell and tap who to swap with (choosing "the rest of this stint" or "until a minute"), or drag one player's cell onto another's to swap them from that block. Dragging a player on the pitch onto one on the bench is a substitution; two players on the pitch, or two on the bench, are refused with a plain explanation, as is the starting lineup (change that on the pitch). Total minutes always equal positions times match length.
+  - **Why it can't break:** every cell holds one position and every position always has one player, so the chart is always consistent. The list of changes is derived from it, and a swap that cannot be written as ordinary substitutions is refused instead of silently dropped.
+  - **Also fixed during the review:** suggested 11-a-side plans used 7.5-minute steps (8, 23, 38...), which made the chart 60 columns wide, so suggested plans now snap to 5-minute marks (minutes are recalculated from the snapped plan). The top tab bar made the whole page scroll sideways on a phone with nine or ten tabs; it now scrolls inside itself.
+  - **Tested:** 23 new engine tests (91 in all), a mouse drag, a tap, a touch press-and-hold drag and a plain swipe (must not drag) in a browser at desktop and phone widths, the long 11-a-side chart, and the live site on a phone-sized screen. Touch was tested with emulated touch events, not on a physical phone.
+  - **Touch:** on touch a drag starts after holding a cell for about a quarter of a second, so an ordinary swipe still scrolls the page.
+  - **Not built yet:** a position swap between two players who stay on the pitch (not a substitution, so done on the pitch), dragging across several blocks to pick a range, and the same editing on the Matchday screen.
 
 ## BL-0017 — Editable substitution plan: quick select and drag and drop
 - **Date:** 2026-10-02
@@ -45,8 +66,8 @@ Next free id: **BL-0018**
 - **Rationale:** Owner: "I want to be able to change the substitution plan use dragging and dropping and quick select."
 - **Effort estimate:** M
 - **Owning agent:** D (plan card), shared engine (plan consistency maths)
-- **Status:** Approved — owner commissioned this directly.
-- **Outcome (2026-10-02):** Done, committed in 410a0b4 and live. The pitch itself is untouched (only the side card changed). Changes depend on each other (a player can't come on before they have gone off), so the plan is replayed after every edit: menu choices that would break a later change are greyed out, a drag that would break one is refused with a message, and removing a change also removes later ones that relied on it, with a message saying so. The chip strip stays in view while scrolling, and dragging near the screen edge scrolls the page. 8 engine tests; every drag and menu path tried in a browser with a mouse, but not yet on a real touch screen. Edits last until the lineup is re-planned (moving players on the pitch, changing availability or pressing Suggest lineup).
+- **Status:** Superseded by BL-0018 (the owner found it did not work in practice; see the review there).
+- **Outcome (2026-10-02):** Done, committed in 410a0b4 and live, then replaced. The pitch itself is untouched (only the side card changed). Changes depend on each other (a player can't come on before they have gone off), so the plan is replayed after every edit: menu choices that would break a later change are greyed out, a drag that would break one is refused with a message, and removing a change also removes later ones that relied on it, with a message saying so. The chip strip stays in view while scrolling, and dragging near the screen edge scrolls the page. 8 engine tests; every drag and menu path tried in a browser with a mouse, but not yet on a real touch screen. Edits last until the lineup is re-planned (moving players on the pitch, changing availability or pressing Suggest lineup).
 
 ## BL-0016 — Season stats: attendance, availability and minutes
 - **Date:** 2026-10-02
