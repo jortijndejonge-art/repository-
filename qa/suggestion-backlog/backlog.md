@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0015**
+Next free id: **BL-0016**
 
 ---
+
+## BL-0015 — Pre-match briefings with read receipts
+- **Date:** 2026-10-02
+- **Source task:** Phase 3 (pre-match briefings: coaching material pushed to the squad, with "seen it" receipts)
+- **Idea:** A manager attaches coaching notes and links (for example YouTube clips) to a match from the Fixtures screen. Players, and parents for their children, see it on the match card marked New, and press "Got it". The manager sees who has read it; editing the briefing resets everyone to unseen. Links must be http(s) only.
+- **Rationale:** Master plan Phase 3.
+- **Effort estimate:** M
+- **Owning agent:** A/B (migration 010, briefing service, routes), C (briefing dialog, match card)
+- **Status:** Approved — owner commissioned this directly ("continue").
+- **Outcome (2026-10-02):** Done, committed in 4e584ab and live. 5 service tests, verified end to end on the live site (script links refused, parents can read and mark seen for their own child but not edit or see receipts, an edit resets the receipts). Not built yet: screenshots and file uploads (links only for now), a briefing tied to a formation rather than a match, and a push or email nudge when a briefing is posted.
 
 ## BL-0014 — Live matchday: clock, substitutions and minutes played
 - **Date:** 2026-10-02
