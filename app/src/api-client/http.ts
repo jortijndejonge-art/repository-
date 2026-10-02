@@ -50,6 +50,9 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
       return request('GET', '/me');
     },
     getSquad: (teamId) => request('GET', `/teams/${enc(teamId)}/players`),
+    addPlayer: (teamId, player) => request('POST', `/teams/${enc(teamId)}/players`, player),
+    updatePlayer: (teamId, memberId, update) =>
+      request('PATCH', `/teams/${enc(teamId)}/players/${enc(memberId)}`, update),
     getFixtures: (teamId, from) =>
       request('GET', `/teams/${enc(teamId)}/fixtures${from ? `?from=${enc(from)}` : ''}`),
     getAvailability: (fixtureId) => request('GET', `/fixtures/${enc(fixtureId)}/availability`),

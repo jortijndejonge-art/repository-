@@ -6,6 +6,7 @@ import { SignIn } from './screens/auth/SignIn';
 import { Verify } from './screens/auth/Verify';
 import { MyMatches } from './screens/availability/MyMatches';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
+import { Squad } from './screens/squad/Squad';
 import './core/shell.css';
 
 export function App() {
@@ -41,7 +42,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'matches' | 'lineup';
+type Tab = 'matches' | 'lineup' | 'squad';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -51,6 +52,7 @@ function Shell({ me }: { me: Me }) {
   const tabs: { id: Tab; label: string }[] = [
     ...(plays ? [{ id: 'matches' as const, label: 'My matches' }] : []),
     ...(canManage ? [{ id: 'lineup' as const, label: 'Lineup planner' }] : []),
+    ...(canManage ? [{ id: 'squad' as const, label: 'Squad' }] : []),
   ];
 
   return (
@@ -88,6 +90,7 @@ function Shell({ me }: { me: Me }) {
       )}
 
       {tab === 'lineup' && canManage && <LineupPlanner me={me} />}
+      {tab === 'squad' && canManage && <Squad me={me} />}
       {tab === 'matches' && <MyMatches me={me} />}
       {tabs.length === 0 && <p className="muted">You're not in any teams yet — ask your club to add you.</p>}
     </div>

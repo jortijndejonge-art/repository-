@@ -1,4 +1,4 @@
-import type { Availability, Formation, FormationLayout, Id, Lineup, Me } from '@hockey/contracts';
+import type { Availability, Formation, FormationLayout, Id, Lineup, Me, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -11,6 +11,9 @@ import { ApiError, type ApiClient } from './types';
 export function createMockClient(): ApiClient {
   const availability = demo.seedAvailability();
   const lineups = new Map<Id, Lineup>();
+  const squads = new Map<Id, PlayerProfile[]>(
+    Object.entries(demo.squads).map(([teamId, players]) => [teamId, players.map((p) => ({ ...p }))]),
+  );
   const customFormations = new Map<Id, Formation[]>();
   const layouts = new Map<Id, Map<string, FormationLayout>>();
   let memberId: Id | null = sessionStore.get()?.replace(/^mock:/, '') ?? null;
@@ -61,7 +64,27 @@ export function createMockClient(): ApiClient {
       return delay(meFor(memberId));
     },
     async getSquad(teamId) {
-      return delay(demo.squads[teamId] ?? []);
+      return delay((squads.get(teamId) ?? []).map((p) => ({ ...p })));
+    },
+    async addPlayer(teamId, player) {
+      const squad = squads.get(teamId) ?? [];
+      const profile: PlayerProfile = {
+        memberId: `new-${Date.now().toString(36)}-${squad.length}`,
+        displayName: player.displayName ?? `${player.firstName} ${player.lastName.charAt(0)}.`,
+        shirtNumber: player.shirtNumber,
+        positions: player.positions,
+        skill: player.skill,
+        stamina: player.stamina,
+        seasonMinutes: 0,
+      };
+      squads.set(teamId, [...squad, profile]);
+      return delay({ ...profile });
+    },
+    async updatePlayer(teamId, id, update) {
+      const player = (squads.get(teamId) ?? []).find((p) => p.memberId === id);
+      if (!player) throw new ApiError(404, 'Player not in this team');
+      Object.assign(player, update);
+      return delay({ ...player });
     },
     async getFixtures(teamId, from) {
       return delay(demo.fixtures.filter((f) => f.teamId === teamId && (!from || f.startsAt >= from)));

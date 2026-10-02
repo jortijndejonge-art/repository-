@@ -9,7 +9,9 @@ import type {
   Lineup,
   Me,
   NewCustomFormation,
+  NewPlayer,
   PlayerProfile,
+  PlayerProfileUpdate,
   SquadFormat,
   SuggestionRequest,
   SuggestionResult,
@@ -30,6 +32,8 @@ export interface ApiClient {
   me(): Promise<Me>;
 
   getSquad(teamId: Id): Promise<PlayerProfile[]>;
+  addPlayer(teamId: Id, player: NewPlayer): Promise<PlayerProfile>;
+  updatePlayer(teamId: Id, memberId: Id, update: PlayerProfileUpdate): Promise<PlayerProfile>;
   getFixtures(teamId: Id, from?: string): Promise<Fixture[]>;
   getAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus): Promise<Availability>;

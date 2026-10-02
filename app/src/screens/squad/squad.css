@@ -1,0 +1,88 @@
+.squad {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.squad__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.squad__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.squad__row {
+  display: grid;
+  grid-template-columns: 34px 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.squad__shirt {
+  font-weight: 800;
+  color: var(--teal);
+  text-align: center;
+}
+
+.squad__name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.squad__lines {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.squad-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.squad-form__lines {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.squad-form__lines legend {
+  grid-column: 1 / -1;
+  padding: 0 0 4px;
+}
+
+.squad-error {
+  color: #ef6461;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 520px) {
+  .squad__row {
+    grid-template-columns: 30px 1fr auto auto;
+  }
+  .squad__lines {
+    display: none;
+  }
+}
