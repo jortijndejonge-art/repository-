@@ -4,6 +4,7 @@ import { migrate } from './db/migrate';
 import { createPool } from './db/pool';
 import { PgRepository } from './db/repository';
 import { ConsoleMailer } from './services/mailer';
+import { ResendMailer, resendSettingsFromEnv } from './services/httpMailer';
 import { SmtpMailer, smtpSettingsFromEnv } from './services/smtpMailer';
 import { DisabledProvider, StripeProvider } from './services/payments';
 
@@ -16,11 +17,13 @@ const payments = process.env.STRIPE_SECRET_KEY
   ? new StripeProvider(process.env.STRIPE_SECRET_KEY, process.env.STRIPE_WEBHOOK_SECRET)
   : new DisabledProvider();
 
-// Real email when MAIL_FROM is set (see docs); otherwise sign-in links are only printed to the log.
+// Real email: Resend's web API if RESEND_API_KEY is set, else SMTP if SMTP settings are set (see deploy.md);
+// otherwise messages are only printed to the log.
+const resend = resendSettingsFromEnv();
 const smtp = smtpSettingsFromEnv();
-const mailer = smtp ? new SmtpMailer(smtp) : new ConsoleMailer();
-if (!smtp && process.env.NODE_ENV === 'production') {
-  console.warn('[mail] MAIL_FROM is not set: sign-in emails will only be printed here, not sent.');
+const mailer = resend ? new ResendMailer(resend) : smtp ? new SmtpMailer(smtp) : new ConsoleMailer();
+if (!resend && !smtp && process.env.NODE_ENV === 'production') {
+  console.warn('[mail] No email provider is configured: emails will only be printed here, not sent.');
 }
 
 const app = buildApp({ repo: new PgRepository(pool), mailer, config, payments, logger: true });

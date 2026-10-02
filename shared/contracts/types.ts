@@ -116,6 +116,25 @@ export interface Fixture {
 }
 
 // ---------------------------------------------------------------------------
+// Announcements
+// ---------------------------------------------------------------------------
+
+export interface Announcement {
+  id: Id;
+  teamId: Id;
+  /** Name of whoever posted it, e.g. "Alex Morgan". */
+  authorName: string;
+  title: string;
+  body: string;
+  createdAt: IsoDateTime;
+}
+
+export interface NewAnnouncement {
+  title: string;
+  body: string;
+}
+
+// ---------------------------------------------------------------------------
 // Training sessions
 // ---------------------------------------------------------------------------
 

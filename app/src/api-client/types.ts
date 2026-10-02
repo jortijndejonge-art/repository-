@@ -1,4 +1,6 @@
 import type {
+  Announcement,
+  NewAnnouncement,
   Availability,
   AvailabilityStatus,
   AuthSession,
@@ -59,6 +61,9 @@ export interface ApiClient {
   addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
   updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
   deleteFixture(fixtureId: Id): Promise<void>;
+  getAnnouncements(teamId: Id): Promise<Announcement[]>;
+  postAnnouncement(teamId: Id, announcement: NewAnnouncement): Promise<Announcement>;
+  deleteAnnouncement(announcementId: Id): Promise<void>;
   getTrainingSessions(teamId: Id, from?: string): Promise<TrainingSession[]>;
   addTrainingSession(teamId: Id, session: NewTrainingSession): Promise<TrainingSession>;
   updateTrainingSession(sessionId: Id, update: TrainingSessionUpdate): Promise<TrainingSession>;

@@ -176,6 +176,12 @@ Migrations apply automatically when the backend starts. Sign-in emails are sent 
 mail service (`MAIL_FROM`); they might land in spam, so check there. Change `SMTP_HOST`, `SMTP_PORT`,
 `SMTP_USER` and `SMTP_PASS` in the settings file to use a mail provider instead.
 
+To switch on real email later, add to `/etc/myhockey.env` and run `pm2 restart myhockey-api --update-env`:
+`RESEND_API_KEY=re_...` and `MAIL_FROM=MyHockey <noreply@solarbytez.co.uk>` (the sending address must be on a domain
+verified in Resend: add the DNS records it shows for solarbytez.co.uk). Optional `MAIL_REPLY_TO=club@...`.
+Resend sends over HTTPS, so the blocked mail ports don't matter. SMTP (`SMTP_HOST`, `SMTP_PORT`, ...) still works
+if no Resend key is set.
+
 Signing in: email links need a working mail account (the server can't send mail itself, because the
 hosting provider blocks port 25), so members sign in with a password. Set yours with
 `cd /opt/myhockey/backend && node --env-file=/etc/myhockey.env --import tsx src/db/setPassword.ts --email you@example.com`

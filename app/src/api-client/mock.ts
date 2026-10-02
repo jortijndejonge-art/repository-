@@ -1,4 +1,4 @@
-import type { Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { Announcement, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -12,6 +12,7 @@ export function createMockClient(): ApiClient {
   const availability = demo.seedAvailability();
   const lineups = new Map<Id, Lineup>();
   const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
+  const announcements: Announcement[] = [];
   const trainingSessions: TrainingSession[] = [];
   const trainingResponses = new Map<string, TrainingResponse>();
   const plans: MembershipPlan[] = demo.membershipPlans.map((p) => ({ ...p }));
@@ -128,6 +129,32 @@ export function createMockClient(): ApiClient {
       if (at >= 0) myMemberships[at] = record;
       else myMemberships.push(record);
       return delay({ demo: true });
+    },
+    async getAnnouncements(teamId) {
+      return delay(
+        announcements
+          .filter((a) => a.teamId === teamId)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .map((a) => ({ ...a })),
+      );
+    },
+    async postAnnouncement(teamId, input) {
+      const author = memberId ? demo.members.find((x) => x.id === memberId) : undefined;
+      const created: Announcement = {
+        id: `an-${Date.now().toString(36)}`,
+        teamId,
+        authorName: author ? `${author.firstName} ${author.lastName}` : 'The club',
+        createdAt: new Date().toISOString(),
+        ...input,
+      };
+      announcements.push(created);
+      return delay({ ...created });
+    },
+    async deleteAnnouncement(id) {
+      const at = announcements.findIndex((a) => a.id === id);
+      if (at < 0) throw new ApiError(404, 'Announcement not found');
+      announcements.splice(at, 1);
+      return delay(undefined);
     },
     async getTrainingSessions(teamId, from) {
       return delay(

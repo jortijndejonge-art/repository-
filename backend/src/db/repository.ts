@@ -2,6 +2,8 @@ import type {
   Availability,
   AvailabilityStatus,
   Club,
+  Announcement,
+  NewAnnouncement,
   Fixture,
   TrainingResponse,
   TrainingSession,
@@ -80,6 +82,12 @@ export interface Repository {
   deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
+
+  // Announcements
+  listAnnouncements(teamId: Id): Promise<Announcement[]>;
+  getAnnouncement(id: Id): Promise<Announcement | null>;
+  addAnnouncement(teamId: Id, authorId: Id, announcement: NewAnnouncement): Promise<Announcement>;
+  deleteAnnouncement(id: Id): Promise<boolean>;
 
   // Training
   listTrainingSessions(teamId: Id, from?: string): Promise<TrainingSession[]>;
@@ -175,6 +183,18 @@ const toFixture = (r: Row): Fixture => ({
   format: r.format as SquadFormat,
   durationMinutes: r.duration_minutes,
   periods: r.periods,
+});
+
+const ANNOUNCEMENT_SELECT = `SELECT a.*, COALESCE(m.first_name || ' ' || m.last_name, 'The club') AS author_name
+  FROM announcements a LEFT JOIN members m ON m.id = a.author_id`;
+
+const toAnnouncement = (r: Row): Announcement => ({
+  id: r.id,
+  teamId: r.team_id,
+  authorName: r.author_name,
+  title: r.title,
+  body: r.body,
+  createdAt: r.created_at,
 });
 
 const toTraining = (r: Row): TrainingSession => ({
@@ -428,6 +448,27 @@ export class PgRepository implements Repository {
       toAvailability,
     );
     return row!;
+  }
+
+  listAnnouncements(teamId: Id) {
+    return this.many(`${ANNOUNCEMENT_SELECT} WHERE a.team_id = $1 ORDER BY a.created_at DESC`, [teamId], toAnnouncement);
+  }
+
+  getAnnouncement(id: Id) {
+    return this.one(`${ANNOUNCEMENT_SELECT} WHERE a.id = $1`, [id], toAnnouncement);
+  }
+
+  async addAnnouncement(teamId: Id, authorId: Id, a: NewAnnouncement) {
+    const { rows } = await this.pool.query(
+      'INSERT INTO announcements (team_id, author_id, title, body) VALUES ($1, $2, $3, $4) RETURNING id',
+      [teamId, authorId, a.title, a.body],
+    );
+    return (await this.getAnnouncement(rows[0].id))!;
+  }
+
+  async deleteAnnouncement(id: Id) {
+    const res = await this.pool.query('DELETE FROM announcements WHERE id = $1', [id]);
+    return (res.rowCount ?? 0) > 0;
   }
 
   listTrainingSessions(teamId: Id, from?: string) {

@@ -489,3 +489,33 @@ describe('training sessions', () => {
     expect((await app.inject({ method: 'POST', url: '/api/v1/teams/u12/training', headers: as(coach), payload: { ...session, durationMinutes: 0 } })).statusCode).toBe(400);
   });
 });
+
+describe('announcements', () => {
+  it('lets a manager post and delete, and the squad reads them newest first', async () => {
+    const coach = await signIn('coach@example.com');
+    const p = await signIn(playerEmail);
+    const url = '/api/v1/teams/u12/announcements';
+
+    const first = await app.inject({ method: 'POST', url, headers: as(coach), payload: { title: 'Kit', body: 'Bring the blue shirts.' } });
+    expect(first.statusCode).toBe(201);
+    expect(first.json()).toMatchObject({ title: 'Kit', teamId: 'u12' });
+    expect(first.json().authorName).toBeTruthy();
+    const second = await app.inject({ method: 'POST', url, headers: as(coach), payload: { title: 'Lift share', body: 'Meet at 9.' } });
+
+    const list = (await app.inject({ method: 'GET', url, headers: as(p) })).json();
+    expect(list.map((a: { title: string }) => a.title).slice(0, 2)).toEqual(['Lift share', 'Kit']);
+
+    expect((await app.inject({ method: 'DELETE', url: `/api/v1/announcements/${first.json().id}`, headers: as(p) })).statusCode).toBe(403);
+    for (const a of [first, second]) {
+      expect((await app.inject({ method: 'DELETE', url: `/api/v1/announcements/${a.json().id}`, headers: as(coach) })).statusCode).toBe(204);
+    }
+  });
+
+  it('refuses posts from players and empty messages', async () => {
+    const p = await signIn(playerEmail);
+    const url = '/api/v1/teams/u12/announcements';
+    expect((await app.inject({ method: 'POST', url, headers: as(p), payload: { title: 'Hi', body: 'There' } })).statusCode).toBe(403);
+    const coach = await signIn('coach@example.com');
+    expect((await app.inject({ method: 'POST', url, headers: as(coach), payload: { title: '', body: 'x' } })).statusCode).toBe(400);
+  });
+});

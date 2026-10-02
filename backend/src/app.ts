@@ -5,6 +5,7 @@ import type {
   Id,
   Lineup,
   NewCustomFormation,
+  NewAnnouncement,
   NewFixture,
   NewTrainingSession,
   TrainingSessionUpdate,
@@ -523,6 +524,44 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
           return lineups.share(req.params.fixtureId, req.body?.memberIds);
         },
       );
+
+      // ---- Announcements (Phase 2) -------------------------------------------------
+      api.get<{ Params: { teamId: Id } }>('/teams/:teamId/announcements', async (req) => {
+        await access.requireTeamMember(await signedIn(req), req.params.teamId);
+        return repo.listAnnouncements(req.params.teamId);
+      });
+
+      api.post<{ Params: { teamId: Id }; Body: NewAnnouncement }>(
+        '/teams/:teamId/announcements',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['title', 'body'],
+              additionalProperties: false,
+              properties: {
+                title: { type: 'string', minLength: 1, maxLength: 120 },
+                body: { type: 'string', minLength: 1, maxLength: 4000 },
+              },
+            },
+          },
+        },
+        async (req, reply) => {
+          const author = await signedIn(req);
+          await access.requireManager(author, req.params.teamId);
+          reply.code(201);
+          return repo.addAnnouncement(req.params.teamId, author, req.body);
+        },
+      );
+
+      api.delete<{ Params: { announcementId: Id } }>('/announcements/:announcementId', async (req, reply) => {
+        const actor = await signedIn(req);
+        const announcement = await repo.getAnnouncement(req.params.announcementId);
+        if (!announcement) throw notFound('Announcement not found');
+        await access.requireManager(actor, announcement.teamId);
+        await repo.deleteAnnouncement(announcement.id);
+        return reply.code(204).send();
+      });
 
       // ---- Training sessions (Phase 2) ---------------------------------------------
       api.get<{ Params: { teamId: Id }; Querystring: { from?: string } }>(

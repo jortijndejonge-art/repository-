@@ -297,6 +297,38 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Fixture' } }
 
+  /teams/{teamId}/announcements:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    get:
+      summary: A team's announcements, newest first
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Announcement' } }
+    post:
+      summary: Post an announcement to the squad (manager/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewAnnouncement' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Announcement' }
+
+  /announcements/{announcementId}:
+    parameters:
+      - { name: announcementId, in: path, required: true, schema: { type: string } }
+    delete:
+      summary: Delete an announcement (manager/admin of its team)
+      responses:
+        '204': { description: Deleted }
+
   /teams/{teamId}/training:
     parameters: [{ $ref: '#/components/parameters/teamId' }]
     get:
@@ -663,6 +695,24 @@ components:
         format: { $ref: '#/components/schemas/SquadFormat' }
         durationMinutes: { type: integer }
         periods: { type: integer }
+
+    Announcement:
+      type: object
+      required: [id, teamId, authorName, title, body, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        authorName: { type: string }
+        title: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    NewAnnouncement:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string, maxLength: 120 }
+        body: { type: string, maxLength: 4000 }
 
     TrainingSession:
       type: object
