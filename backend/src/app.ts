@@ -563,6 +563,12 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
         },
       );
 
+      // ---- Season stats (Phase 2) ----------------------------------------------------
+      api.get<{ Params: { teamId: Id } }>('/teams/:teamId/stats', async (req) => {
+        await access.requireManager(await signedIn(req), req.params.teamId);
+        return repo.getTeamStats(req.params.teamId, new Date());
+      });
+
       // ---- Pre-match briefings (Phase 3) ---------------------------------------------
       // `?memberId=` lets a parent ask on behalf of a child ("have they seen it?").
       api.get<{ Params: { fixtureId: Id }; Querystring: { memberId?: Id } }>(

@@ -3,6 +3,7 @@ import type {
   AvailabilityStatus,
   Club,
   Announcement,
+  PlayerStats,
   Briefing,
   NewBriefing,
   LiveStatus,
@@ -88,6 +89,10 @@ export interface Repository {
   deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
+
+  // Season stats
+  /** Attendance, availability and minutes for every player in a team, counting only things before `now`. */
+  getTeamStats(teamId: Id, now: Date): Promise<PlayerStats[]>;
 
   // Briefings
   getBriefing(fixtureId: Id): Promise<Briefing | null>;
@@ -487,6 +492,39 @@ export class PgRepository implements Repository {
       toAvailability,
     );
     return row!;
+  }
+
+  getTeamStats(teamId: Id, now: Date) {
+    // Training counts only sessions where attendance was recorded, so a session nobody ticked doesn't count against anyone.
+    return this.many(
+      `WITH past_sessions AS (
+         SELECT s.id FROM training_sessions s
+          WHERE s.team_id = $1 AND s.starts_at < $2
+            AND EXISTS (SELECT 1 FROM training_responses r WHERE r.session_id = s.id AND r.attended IS NOT NULL)
+       ), past_fixtures AS (
+         SELECT id FROM fixtures WHERE team_id = $1 AND starts_at < $2
+       )
+       SELECT p.member_id, p.display_name, p.season_minutes,
+              (SELECT count(*) FROM past_sessions) AS training_total,
+              (SELECT count(*) FROM training_responses r JOIN past_sessions ps ON ps.id = r.session_id
+                WHERE r.member_id = p.member_id AND r.attended) AS training_attended,
+              (SELECT count(*) FROM past_fixtures) AS matches_total,
+              (SELECT count(*) FROM availability a JOIN past_fixtures pf ON pf.id = a.fixture_id
+                WHERE a.member_id = p.member_id AND a.status = 'available') AS matches_available
+         FROM player_profiles p
+         JOIN team_memberships tm ON tm.member_id = p.member_id AND tm.team_id = $1 AND 'player' = ANY (tm.roles)
+        ORDER BY p.display_name`,
+      [teamId, now],
+      (r) => ({
+        memberId: r.member_id as Id,
+        displayName: r.display_name as string,
+        trainingAttended: Number(r.training_attended),
+        trainingTotal: Number(r.training_total),
+        matchesAvailable: Number(r.matches_available),
+        matchesTotal: Number(r.matches_total),
+        seasonMinutes: r.season_minutes as number,
+      }),
+    );
   }
 
   getBriefing(fixtureId: Id) {

@@ -328,6 +328,17 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Fixture' } }
 
+  /teams/{teamId}/stats:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    get:
+      summary: Season stats per player - training attended, matches available for, minutes played (manager/admin)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/PlayerStats' } }
+
   /fixtures/{fixtureId}/briefing:
     parameters:
       - { name: fixtureId, in: path, required: true, schema: { type: string } }
@@ -838,6 +849,18 @@ components:
         format: { $ref: '#/components/schemas/SquadFormat' }
         durationMinutes: { type: integer }
         periods: { type: integer }
+
+    PlayerStats:
+      type: object
+      required: [memberId, displayName, trainingAttended, trainingTotal, matchesAvailable, matchesTotal, seasonMinutes]
+      properties:
+        memberId: { type: string }
+        displayName: { type: string }
+        trainingAttended: { type: integer }
+        trainingTotal: { type: integer, description: Past sessions where attendance was recorded }
+        matchesAvailable: { type: integer }
+        matchesTotal: { type: integer, description: Matches already past their start time }
+        seasonMinutes: { type: integer }
 
     Briefing:
       type: object

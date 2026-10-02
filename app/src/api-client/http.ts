@@ -73,6 +73,7 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     addFixture: (teamId, fixture) => request('POST', `/teams/${enc(teamId)}/fixtures`, fixture),
     updateFixture: (fixtureId, update) => request('PATCH', `/fixtures/${enc(fixtureId)}`, update),
     deleteFixture: (fixtureId) => request('DELETE', `/fixtures/${enc(fixtureId)}`),
+    getTeamStats: (teamId) => request('GET', `/teams/${enc(teamId)}/stats`),
     getBriefing: (fixtureId, memberId) =>
       request('GET', `/fixtures/${enc(fixtureId)}/briefing${memberId ? `?memberId=${enc(memberId)}` : ''}`),
     saveBriefing: (fixtureId, briefing) => request('PUT', `/fixtures/${enc(fixtureId)}/briefing`, briefing),

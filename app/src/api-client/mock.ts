@@ -142,6 +142,29 @@ export function createMockClient(): ApiClient {
       else myMemberships.push(record);
       return delay({ demo: true });
     },
+    async getTeamStats(teamId) {
+      const nowIso = new Date().toISOString();
+      const pastSessions = trainingSessions.filter(
+        (s) =>
+          s.teamId === teamId &&
+          s.startsAt < nowIso &&
+          [...trainingResponses.values()].some((r) => r.sessionId === s.id && r.attended !== undefined),
+      );
+      const pastFixtures = fixtures.filter((f) => f.teamId === teamId && f.startsAt < nowIso);
+      return delay(
+        (squads.get(teamId) ?? []).map((p) => ({
+          memberId: p.memberId,
+          displayName: p.displayName,
+          trainingAttended: pastSessions.filter((s) => trainingResponses.get(`${s.id}/${p.memberId}`)?.attended).length,
+          trainingTotal: pastSessions.length,
+          matchesAvailable: pastFixtures.filter((f) =>
+            availability.some((a) => a.fixtureId === f.id && a.memberId === p.memberId && a.status === 'available'),
+          ).length,
+          matchesTotal: pastFixtures.length,
+          seasonMinutes: p.seasonMinutes,
+        })),
+      );
+    },
     async getBriefing(fixtureId, forMember) {
       const b = briefings.get(fixtureId);
       if (!b) return delay(null);

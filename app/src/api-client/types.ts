@@ -1,4 +1,5 @@
 import type {
+  PlayerStats,
   Briefing,
   BriefingRead,
   NewBriefing,
@@ -67,6 +68,8 @@ export interface ApiClient {
   addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
   updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
   deleteFixture(fixtureId: Id): Promise<void>;
+  /** Manager: attendance, availability and minutes for each player in a team. */
+  getTeamStats(teamId: Id): Promise<PlayerStats[]>;
   /** The pre-match briefing, or null. `memberId` asks on behalf of a child. */
   getBriefing(fixtureId: Id, memberId?: Id): Promise<Briefing | null>;
   saveBriefing(fixtureId: Id, briefing: NewBriefing): Promise<Briefing>;

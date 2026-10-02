@@ -140,6 +140,24 @@ export interface Fixture {
 }
 
 // ---------------------------------------------------------------------------
+// Season stats
+// ---------------------------------------------------------------------------
+
+/** One player's season so far, as a manager sees it. */
+export interface PlayerStats {
+  memberId: Id;
+  displayName: string;
+  /** Past training sessions where the manager recorded attendance, and how many of those this player came to. */
+  trainingAttended: number;
+  trainingTotal: number;
+  /** Matches already played (or past their start time), and how many this player had said they were available for. */
+  matchesAvailable: number;
+  matchesTotal: number;
+  /** Minutes on the pitch in finished live matches. */
+  seasonMinutes: number;
+}
+
+// ---------------------------------------------------------------------------
 // Pre-match briefings
 // ---------------------------------------------------------------------------
 

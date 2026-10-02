@@ -519,3 +519,32 @@ describe('announcements', () => {
     expect((await app.inject({ method: 'POST', url, headers: as(coach), payload: { title: '', body: 'x' } })).statusCode).toBe(400);
   });
 });
+
+describe('season stats', () => {
+  it('counts attendance only for past sessions where it was recorded, and is for managers only', async () => {
+    const coach = await signIn('coach@example.com');
+    const p = await signIn(playerEmail);
+    const post = (payload: object) => app.inject({ method: 'POST', url: '/api/v1/teams/u12/training', headers: as(coach), payload });
+    const past = (await post({ startsAt: '2020-01-07T17:30:00.000Z', durationMinutes: 60, venue: 'Old Astro' })).json();
+    const unrecorded = (await post({ startsAt: '2020-01-14T17:30:00.000Z', durationMinutes: 60, venue: 'Old Astro' })).json();
+    const future = (await post({ startsAt: '2090-01-07T17:30:00.000Z', durationMinutes: 60, venue: 'Future Astro' })).json();
+
+    for (const attended of [true, false]) {
+      const who = attended ? player.memberId : teammate.memberId;
+      const res = await app.inject({ method: 'PUT', url: `/api/v1/training/${past.id}/attendance`, headers: as(coach), payload: { memberId: who, attended } });
+      expect(res.statusCode).toBe(204);
+    }
+
+    const stats = (await app.inject({ method: 'GET', url: '/api/v1/teams/u12/stats', headers: as(coach) })).json();
+    const mine = stats.find((s: { memberId: string }) => s.memberId === player.memberId);
+    const other = stats.find((s: { memberId: string }) => s.memberId === teammate.memberId);
+    expect(stats).toHaveLength(u12Players.length);
+    expect(mine).toMatchObject({ trainingAttended: 1, trainingTotal: 1 });
+    expect(other).toMatchObject({ trainingAttended: 0, trainingTotal: 1 });
+
+    expect((await app.inject({ method: 'GET', url: '/api/v1/teams/u12/stats', headers: as(p) })).statusCode).toBe(403);
+    for (const s of [past, unrecorded, future]) {
+      await app.inject({ method: 'DELETE', url: `/api/v1/training/${s.id}`, headers: as(coach) });
+    }
+  });
+});

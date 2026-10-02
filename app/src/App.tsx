@@ -14,6 +14,7 @@ import { Matchday } from './screens/matchday/Matchday';
 import { Account } from './screens/account/Account';
 import { Membership } from './screens/membership/Membership';
 import { Squad } from './screens/squad/Squad';
+import { Stats } from './screens/stats/Stats';
 import { Training } from './screens/training/Training';
 import './core/shell.css';
 
@@ -50,7 +51,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-type Tab = 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'matchday' | 'training' | 'membership' | 'account';
+type Tab = 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'matchday' | 'stats' | 'training' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -70,6 +71,7 @@ function Shell({ me }: { me: Me }) {
     ...(canManage ? [{ id: 'fixtures' as const, label: 'Fixtures' }] : []),
     ...(canManage ? [{ id: 'matchday' as const, label: 'Matchday' }] : []),
     ...(canManage || plays ? [{ id: 'training' as const, label: 'Training' }] : []),
+    ...(canManage ? [{ id: 'stats' as const, label: 'Stats' }] : []),
     ...(canManage ? [{ id: 'squad' as const, label: 'Squad' }] : []),
     { id: 'membership' as const, label: 'Membership' },
     { id: 'account' as const, label: 'Account' },
@@ -113,6 +115,7 @@ function Shell({ me }: { me: Me }) {
       {tab === 'fixtures' && canManage && <Fixtures me={me} />}
       {tab === 'matchday' && canManage && <Matchday me={me} />}
       {tab === 'training' && <Training me={me} />}
+      {tab === 'stats' && canManage && <Stats me={me} />}
       {tab === 'squad' && canManage && <Squad me={me} />}
       {tab === 'family' && <Family me={me} />}
       {tab === 'announcements' && <Announcements me={me} />}
