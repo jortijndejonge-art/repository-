@@ -8,6 +8,7 @@
     "start": "tsx src/server.ts",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
+    "bootstrap": "tsx src/db/bootstrap.ts",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },
@@ -16,11 +17,13 @@
     "@hockey/demo": "0.1.0",
     "@hockey/engine": "0.1.0",
     "fastify": "^5.12.5",
+    "nodemailer": "^10.0.13",
     "pg": "^8.23.0",
     "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.2"

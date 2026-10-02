@@ -4,6 +4,7 @@ import { migrate } from './db/migrate';
 import { createPool } from './db/pool';
 import { PgRepository } from './db/repository';
 import { ConsoleMailer } from './services/mailer';
+import { SmtpMailer, smtpSettingsFromEnv } from './services/smtpMailer';
 import { DisabledProvider, StripeProvider } from './services/payments';
 
 const pool = createPool();
@@ -15,7 +16,14 @@ const payments = process.env.STRIPE_SECRET_KEY
   ? new StripeProvider(process.env.STRIPE_SECRET_KEY, process.env.STRIPE_WEBHOOK_SECRET)
   : new DisabledProvider();
 
-const app = buildApp({ repo: new PgRepository(pool), mailer: new ConsoleMailer(), config, payments, logger: true });
+// Real email when MAIL_FROM is set (see docs); otherwise sign-in links are only printed to the log.
+const smtp = smtpSettingsFromEnv();
+const mailer = smtp ? new SmtpMailer(smtp) : new ConsoleMailer();
+if (!smtp && process.env.NODE_ENV === 'production') {
+  console.warn('[mail] MAIL_FROM is not set: sign-in emails will only be printed here, not sent.');
+}
+
+const app = buildApp({ repo: new PgRepository(pool), mailer, config, payments, logger: true });
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' });
 
