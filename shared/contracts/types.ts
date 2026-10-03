@@ -140,6 +140,16 @@ export interface Fixture {
 }
 
 // ---------------------------------------------------------------------------
+// Availability chasing
+// ---------------------------------------------------------------------------
+
+/** Who was reminded to say whether they can play. */
+export interface ChaseResult {
+  reminded: number;
+  names: string[];
+}
+
+// ---------------------------------------------------------------------------
 // Bulk import (CSV from Spond, Teamo, spreadsheets)
 // ---------------------------------------------------------------------------
 
@@ -490,6 +500,8 @@ export interface ChatMessage {
   authorName: string;
   /** e.g. "Manager", "Player", "Parent of Quinn G." */
   authorRole: string;
+  /** An automatic reminder rather than something a person wrote. */
+  system?: boolean;
   body: string;
   lineup?: LineupCard;
   createdAt: IsoDateTime;

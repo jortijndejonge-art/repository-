@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AvailabilityStatus, Id, PlayerProfile } from '@hockey/contracts';
 
 interface AvailabilityPanelProps {
@@ -5,6 +6,8 @@ interface AvailabilityPanelProps {
   availability: Record<Id, AvailabilityStatus>;
   needed: number;
   onChange: (memberId: Id, status: AvailabilityStatus) => void;
+  /** Remind everyone who has not answered; shown only while some have not. */
+  onRemind?: () => Promise<void>;
 }
 
 const CHOICES: { status: AvailabilityStatus; label: string; symbol: string }[] = [
@@ -13,7 +16,8 @@ const CHOICES: { status: AvailabilityStatus; label: string; symbol: string }[] =
   { status: 'unavailable', label: 'Unavailable', symbol: '✕' },
 ];
 
-export function AvailabilityPanel({ squad, availability, needed, onChange }: AvailabilityPanelProps) {
+export function AvailabilityPanel({ squad, availability, needed, onChange, onRemind }: AvailabilityPanelProps) {
+  const [reminding, setReminding] = useState(false);
   const count = (s: AvailabilityStatus) => squad.filter((p) => (availability[p.memberId] ?? 'no_response') === s).length;
   const confirmed = count('available');
   const short = Math.max(0, needed - confirmed);
@@ -29,6 +33,23 @@ export function AvailabilityPanel({ squad, availability, needed, onChange }: Ava
       <p className="muted small">
         {count('maybe')} maybe · {count('unavailable')} unavailable · {count('no_response')} no reply
       </p>
+      {onRemind && count('no_response') > 0 && (
+        <button
+          type="button"
+          className="btn"
+          disabled={reminding}
+          onClick={async () => {
+            setReminding(true);
+            try {
+              await onRemind();
+            } finally {
+              setReminding(false);
+            }
+          }}
+        >
+          Remind {count('no_response')} who {count('no_response') === 1 ? 'has' : 'have'}n&apos;t replied
+        </button>
+      )}
       <ul className="availability">
         {squad.map((p) => {
           const current = availability[p.memberId] ?? 'no_response';

@@ -26,7 +26,7 @@ if (!resend && !smtp && process.env.NODE_ENV === 'production') {
   console.warn('[mail] No email provider is configured: emails will only be printed here, not sent.');
 }
 
-const app = buildApp({ repo: new PgRepository(pool), mailer, config, payments, logger: true });
+const app = buildApp({ repo: new PgRepository(pool), mailer, emailEnabled: Boolean(resend || smtp), config, payments, logger: true });
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' });
 
@@ -35,6 +35,13 @@ const reminders = setInterval(() => {
   app.sendPaymentReminders().catch((err) => app.log.error(err, 'payment reminders failed'));
 }, 6 * 60 * 60 * 1000);
 reminders.unref();
+
+// Availability chasing: every three hours, remind anyone who has not said whether they can play a match in the
+// next three days (each match at most once a day). The reminder is posted in the match chat.
+const chasing = setInterval(() => {
+  app.chaseAvailability().catch((err) => app.log.error(err, 'availability chasing failed'));
+}, 3 * 60 * 60 * 1000);
+chasing.unref();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {

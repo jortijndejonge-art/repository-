@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   ChatThread,
   ChatUnread,
+  ChaseResult,
   EventKind,
   ImportRequest,
   ImportResult,
@@ -74,6 +75,8 @@ export interface ApiClient {
   addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
   updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
   deleteFixture(fixtureId: Id): Promise<void>;
+  /** Manager: remind everyone who has not said whether they can play (posted in the match chat). */
+  chaseAvailability(fixtureId: Id): Promise<ChaseResult>;
   /** Manager: bulk-add players from a spreadsheet. Bad rows are skipped with a reason, not fatal. */
   importPlayers(teamId: Id, request: ImportRequest): Promise<ImportResult>;
   /** Manager: attendance, availability and minutes for each player in a team. */

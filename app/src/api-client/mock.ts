@@ -1,4 +1,4 @@
-import type { ChatMessage, EventKind, ImportResult, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { ChaseResult, ChatMessage, EventKind, ImportResult, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { benchNow, pitchAt, secondsPlayed, minutesFromPlan, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -161,6 +161,12 @@ export function createMockClient(): ApiClient {
       if (at >= 0) myMemberships[at] = record;
       else myMemberships.push(record);
       return delay({ demo: true });
+    },
+    async chaseAvailability(fixtureId) {
+      const f = fixture(fixtureId);
+      const answered = new Set(availability.filter((a) => a.fixtureId === fixtureId && a.status !== 'no_response').map((a) => a.memberId));
+      const names = (squads.get(f.teamId) ?? []).filter((p) => !answered.has(p.memberId)).map((p) => p.displayName);
+      return delay({ reminded: names.length, names });
     },
     async importPlayers(teamId, req) {
       const squad = squads.get(teamId) ?? [];

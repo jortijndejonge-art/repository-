@@ -29,6 +29,7 @@ import { badRequest, forbidden, HttpError, notFound, unauthorized } from './serv
 import { BriefingService } from './services/briefings';
 import { ImportService } from './services/importer';
 import { LineupService } from './services/lineups';
+import { ChaseService } from './services/chase';
 import { ChatService } from './services/chat';
 import { LiveService } from './services/live';
 import { TrainingService } from './services/training';
@@ -38,6 +39,8 @@ import { DisabledProvider, PaymentService, type PaymentProvider } from './servic
 export interface AppDeps {
   repo: Repository;
   mailer: Mailer;
+  /** True when real email is set up, so reminders are also emailed. */
+  emailEnabled?: boolean;
   config: Config;
   /** Payment processor; payments are switched off when omitted. */
   payments?: PaymentProvider;
@@ -48,6 +51,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     /** Email members whose membership payment is due soon; returns how many were emailed. */
     sendPaymentReminders(): Promise<number>;
+    /** Remind players (and parents) who have not answered for matches in the next three days; returns matches chased. */
+    chaseAvailability(): Promise<number>;
   }
   interface FastifyRequest {
     memberId?: Id;
@@ -90,7 +95,7 @@ const trainingProps = {
 } as const;
 const strategy = { enum: ['fair', 'strongest', 'stamina'] } as const;
 
-export function buildApp({ repo, mailer, config, payments = new DisabledProvider(), logger = false }: AppDeps): FastifyInstance {
+export function buildApp({ repo, mailer, emailEnabled = false, config, payments = new DisabledProvider(), logger = false }: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
   const auth = new AuthService(repo, mailer, config);
   const access = new Access(repo);
@@ -99,6 +104,7 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
   const training = new TrainingService(repo);
   const live = new LiveService(repo);
   const importer = new ImportService(repo, auth);
+  const chaser = new ChaseService(repo, mailer, config.appUrl, emailEnabled);
   const briefings = new BriefingService(repo);
   const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
 
@@ -767,6 +773,12 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
         chat.unread(req.params.teamId, await signedIn(req)),
       );
 
+      // ---- Availability chasing (Phase 3) --------------------------------------------
+      api.post<{ Params: { fixtureId: Id } }>('/fixtures/:fixtureId/chase', async (req) => {
+        await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+        return chaser.chase(req.params.fixtureId, { force: true });
+      });
+
       // ---- Announcements (Phase 2) -------------------------------------------------
       api.get<{ Params: { teamId: Id } }>('/teams/:teamId/announcements', async (req) => {
         await access.requireTeamMember(await signedIn(req), req.params.teamId);
@@ -953,6 +965,7 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
   );
 
   app.decorate('sendPaymentReminders', () => paymentService.sendDueReminders());
+  app.decorate('chaseAvailability', () => chaser.chaseUpcoming());
 
   return app;
 }

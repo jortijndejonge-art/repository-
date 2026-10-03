@@ -355,6 +355,24 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/PlayerStats' } }
 
+  /fixtures/{fixtureId}/chase:
+    parameters:
+      - { name: fixtureId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Remind everyone who has not said whether they can play, in the match chat (and by email when email is set up). Manager/admin. The server also does this automatically for matches in the next three days.
+      responses:
+        '200':
+          description: Who was reminded (nobody if everyone has answered)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reminded, names]
+                properties:
+                  reminded: { type: integer }
+                  names: { type: array, items: { type: string } }
+        '409': { description: Everyone was already reminded in the last hour }
+
   /fixtures/{fixtureId}/briefing:
     parameters:
       - { name: fixtureId, in: path, required: true, schema: { type: string } }

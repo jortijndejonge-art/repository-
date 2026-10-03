@@ -364,6 +364,17 @@ export function LineupPlanner({ me }: { me: Me }) {
     }
   };
 
+  /** Remind everyone who has not answered; the reminder appears in the match chat. */
+  const remind = async () => {
+    if (!fixture) return;
+    try {
+      const { reminded, names } = await api.chaseAvailability(fixture.id);
+      toast(reminded ? `Reminder posted in the match chat for ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''}` : 'Everyone has answered');
+    } catch (err) {
+      toast((err as Error).message);
+    }
+  };
+
   /** Save, then post the lineup into the match chat as a card. */
   const postToChat = async (note: string) => {
     const d = draft();
@@ -621,6 +632,7 @@ export function LineupPlanner({ me }: { me: Me }) {
             availability={availability}
             needed={formation.slots.length}
             onChange={updateAvailability}
+            onRemind={remind}
           />
         </aside>
       </div>

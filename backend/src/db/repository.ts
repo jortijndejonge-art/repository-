@@ -129,9 +129,15 @@ export interface Repository {
   addAnnouncement(teamId: Id, authorId: Id, announcement: NewAnnouncement): Promise<Announcement>;
   deleteAnnouncement(id: Id): Promise<boolean>;
 
+  // Availability chasing
+  /** Matches starting in [from, to). */
+  listFixturesBetween(from: Date, to: Date): Promise<Fixture[]>;
+  /** Record a reminder for a match, only if it was not reminded since `notSince`; false if it was. */
+  claimChase(fixtureId: Id, at: Date, notSince: Date): Promise<boolean>;
+
   // Event chat
   listEventMessages(kind: EventKind, eventId: Id): Promise<StoredMessage[]>;
-  addEventMessage(msg: { kind: EventKind; eventId: Id; teamId: Id; authorId: Id; body: string; lineup?: LineupCard }): Promise<StoredMessage>;
+  addEventMessage(msg: { kind: EventKind; eventId: Id; teamId: Id; authorId: Id | null; body: string; lineup?: LineupCard; system?: boolean }): Promise<StoredMessage>;
   getEventMessage(id: Id): Promise<StoredMessage | null>;
   deleteEventMessage(id: Id): Promise<void>;
   markEventChatRead(kind: EventKind, eventId: Id, memberId: Id): Promise<void>;
@@ -286,6 +292,8 @@ export interface StoredMessage {
   eventId: Id;
   authorId: Id | null;
   authorName: string;
+  /** An automatic message (a reminder), not written by a person. */
+  system?: boolean;
   body: string;
   lineup?: LineupCard;
   createdAt: string;
@@ -297,7 +305,8 @@ const toStoredMessage = (r: Row): StoredMessage => ({
   kind: r.fixture_id ? 'match' : 'training',
   eventId: r.fixture_id ?? r.session_id,
   authorId: r.author_id,
-  authorName: r.author_first ? `${r.author_first} ${r.author_last}` : 'Former member',
+  authorName: r.system ? 'Reminder' : r.author_first ? `${r.author_first} ${r.author_last}` : 'Former member',
+  ...(r.system ? { system: true } : {}),
   body: r.body,
   ...(r.lineup ? { lineup: r.lineup } : {}),
   createdAt: r.created_at,
@@ -729,10 +738,22 @@ export class PgRepository implements Repository {
     );
   }
 
-  async addEventMessage(msg: { kind: EventKind; eventId: Id; teamId: Id; authorId: Id; body: string; lineup?: LineupCard }) {
+  listFixturesBetween(from: Date, to: Date) {
+    return this.many('SELECT * FROM fixtures WHERE starts_at >= $1 AND starts_at < $2 ORDER BY starts_at', [from, to], toFixture);
+  }
+
+  async claimChase(fixtureId: Id, at: Date, notSince: Date) {
+    const res = await this.pool.query(
+      'UPDATE fixtures SET last_chased_at = $2 WHERE id = $1 AND (last_chased_at IS NULL OR last_chased_at < $3)',
+      [fixtureId, at, notSince],
+    );
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  async addEventMessage(msg: { kind: EventKind; eventId: Id; teamId: Id; authorId: Id | null; body: string; lineup?: LineupCard; system?: boolean }) {
     const { rows } = await this.pool.query(
-      `INSERT INTO event_messages (team_id, fixture_id, session_id, author_id, body, lineup)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      `INSERT INTO event_messages (team_id, fixture_id, session_id, author_id, body, lineup, system)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
       [
         msg.teamId,
         msg.kind === 'match' ? msg.eventId : null,
@@ -740,6 +761,7 @@ export class PgRepository implements Repository {
         msg.authorId,
         msg.body,
         msg.lineup ? JSON.stringify(msg.lineup) : null,
+        msg.system ?? false,
       ],
     );
     return (await this.getEventMessage(rows[0].id))!;
