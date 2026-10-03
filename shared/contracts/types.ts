@@ -140,6 +140,47 @@ export interface Fixture {
 }
 
 // ---------------------------------------------------------------------------
+// Bulk import (CSV from Spond, Teamo, spreadsheets)
+// ---------------------------------------------------------------------------
+
+/** One person from a spreadsheet, tidied and ready to become a player. */
+export interface ImportRow {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  shirtNumber?: number;
+  positions?: PositionLine[];
+  /** A parent or guardian to link to this player. */
+  guardianEmail?: string;
+  guardianFirstName?: string;
+  guardianLastName?: string;
+}
+
+export interface ImportRequest {
+  players: ImportRow[];
+  /** Also create a sign-in password for each player who has an email. */
+  createLogins: boolean;
+}
+
+/** A sign-in created during an import, shown once so the manager can hand it out. */
+export interface ImportLogin {
+  name: string;
+  email: string;
+  password: string;
+  /** "Player" or "Parent of Kit Young" */
+  role: string;
+}
+
+export interface ImportResult {
+  created: number;
+  guardiansLinked: number;
+  /** Rows that were not imported, by position in the request (0-based), with the reason. */
+  skipped: { index: number; name: string; reason: string }[];
+  logins: ImportLogin[];
+}
+
+// ---------------------------------------------------------------------------
 // Season stats
 // ---------------------------------------------------------------------------
 

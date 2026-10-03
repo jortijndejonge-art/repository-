@@ -3,6 +3,7 @@ import type { Id, Me, NewPlayer, PlayerProfile } from '@hockey/contracts';
 import { api } from '../../api-client';
 import { managedTeams } from '../../core/auth';
 import { useToast } from '../../core/Toast';
+import { ImportPanel } from './ImportPanel';
 import { PlayerDialog } from './PlayerDialog';
 import './squad.css';
 
@@ -12,6 +13,7 @@ export function Squad({ me }: { me: Me }) {
   const [teamId, setTeamId] = useState<Id>(teams[0]?.id ?? '');
   const [squad, setSquad] = useState<PlayerProfile[] | null>(null);
   const [dialog, setDialog] = useState<{ player?: PlayerProfile } | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(async () => {
     if (!teamId) return;
@@ -46,6 +48,19 @@ export function Squad({ me }: { me: Me }) {
     setDialog(null);
   };
 
+  if (importing) {
+    return (
+      <section className="squad">
+        <ImportPanel
+          teams={teams}
+          defaultTeamId={teamId}
+          onImported={() => load().catch(() => toast('Could not refresh the squad'))}
+          onClose={() => setImporting(false)}
+        />
+      </section>
+    );
+  }
+
   return (
     <section className="squad">
       <div className="squad__bar">
@@ -61,6 +76,9 @@ export function Squad({ me }: { me: Me }) {
           <strong>{teams[0]!.name}</strong>
         )}
         <span className="spacer" />
+        <button type="button" className="btn" onClick={() => setImporting(true)}>
+          Import
+        </button>
         <button type="button" className="btn btn--primary" onClick={() => setDialog({})}>
           Add player
         </button>

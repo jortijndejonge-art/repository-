@@ -1,4 +1,4 @@
-import type { ChatMessage, EventKind, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { ChatMessage, EventKind, ImportResult, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { benchNow, pitchAt, secondsPlayed, minutesFromPlan, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -161,6 +161,40 @@ export function createMockClient(): ApiClient {
       if (at >= 0) myMemberships[at] = record;
       else myMemberships.push(record);
       return delay({ demo: true });
+    },
+    async importPlayers(teamId, req) {
+      const squad = squads.get(teamId) ?? [];
+      const result: ImportResult = { created: 0, guardiansLinked: 0, skipped: [], logins: [] };
+      const shortName = (first: string, last: string) => (last === '-' || last === '' ? first : `${first} ${last.charAt(0)}.`);
+      const parentsSeen = new Set<string>();
+      req.players.forEach((row, index) => {
+        const name = `${row.firstName} ${row.lastName === '-' ? '' : row.lastName}`.trim();
+        const displayName = shortName(row.firstName, row.lastName);
+        if (squad.some((p) => p.displayName.toLowerCase() === displayName.toLowerCase())) {
+          result.skipped.push({ index, name, reason: 'Looks like a player who is already in the squad (same name). Add them by hand if they are different.' });
+          return;
+        }
+        squad.push({
+          memberId: `imp-${Date.now().toString(36)}-${squad.length}`,
+          displayName,
+          shirtNumber: row.shirtNumber,
+          positions: row.positions?.length ? row.positions : ['MID'],
+          skill: 5,
+          stamina: 5,
+          seasonMinutes: 0,
+        });
+        result.created++;
+        if (req.createLogins && row.email) result.logins.push({ name, email: row.email, password: 'demo-password-123', role: 'Player' });
+        if (row.guardianEmail) {
+          result.guardiansLinked++;
+          if (!parentsSeen.has(row.guardianEmail)) {
+            parentsSeen.add(row.guardianEmail);
+            result.logins.push({ name: `${row.guardianFirstName ?? 'Parent'} ${row.guardianLastName ?? (row.lastName === '-' ? 'Guardian' : row.lastName)}`.trim(), email: row.guardianEmail, password: 'demo-password-123', role: `Parent of ${name}` });
+          }
+        }
+      });
+      squads.set(teamId, squad);
+      return delay(result);
     },
     async getTeamStats(teamId) {
       const nowIso = new Date().toISOString();

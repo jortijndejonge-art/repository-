@@ -5,6 +5,7 @@ import type {
   Id,
   Lineup,
   NewCustomFormation,
+  ImportRequest,
   NewAnnouncement,
   NewBriefing,
   NewGuardian,
@@ -26,6 +27,7 @@ import { Access } from './services/access';
 import { AuthService } from './services/auth';
 import { badRequest, forbidden, HttpError, notFound, unauthorized } from './services/errors';
 import { BriefingService } from './services/briefings';
+import { ImportService } from './services/importer';
 import { LineupService } from './services/lineups';
 import { ChatService } from './services/chat';
 import { LiveService } from './services/live';
@@ -96,6 +98,7 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
   const chat = new ChatService(repo, access, lineups);
   const training = new TrainingService(repo);
   const live = new LiveService(repo);
+  const importer = new ImportService(repo, auth);
   const briefings = new BriefingService(repo);
   const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
 
@@ -244,6 +247,47 @@ export function buildApp({ repo, mailer, config, payments = new DisabledProvider
           if (!squad.some((p) => p.memberId === req.params.memberId)) throw notFound('Player not in this team');
           reply.code(201);
           return auth.addGuardian(req.params.teamId, req.params.memberId, req.body);
+        },
+      );
+
+      api.post<{ Params: { teamId: Id }; Body: ImportRequest }>(
+        '/teams/:teamId/import',
+        {
+          bodyLimit: 2_000_000,
+          schema: {
+            body: {
+              type: 'object',
+              required: ['players', 'createLogins'],
+              additionalProperties: false,
+              properties: {
+                createLogins: { type: 'boolean' },
+                players: {
+                  type: 'array',
+                  maxItems: 500,
+                  items: {
+                    type: 'object',
+                    required: ['firstName', 'lastName'],
+                    additionalProperties: false,
+                    properties: {
+                      firstName: { type: 'string', minLength: 1, maxLength: 80 },
+                      lastName: { type: 'string', minLength: 1, maxLength: 80 },
+                      email: { type: 'string', maxLength: 320 },
+                      phone: { type: 'string', maxLength: 40 },
+                      shirtNumber: { type: 'integer', minimum: 0, maximum: 999 },
+                      positions,
+                      guardianEmail: { type: 'string', maxLength: 320 },
+                      guardianFirstName: { type: 'string', maxLength: 80 },
+                      guardianLastName: { type: 'string', maxLength: 80 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        async (req) => {
+          await access.requireManager(await signedIn(req), req.params.teamId);
+          return importer.run(req.params.teamId, req.body);
         },
       );
 

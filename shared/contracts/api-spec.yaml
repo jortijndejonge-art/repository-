@@ -299,6 +299,22 @@ paths:
                   guardian: { $ref: '#/components/schemas/GuardianSummary' }
                   password: { type: string }
 
+  /teams/{teamId}/import:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    post:
+      summary: Bulk-add players from a spreadsheet (manager/admin). One bad row never stops the rest; skipped rows come back with a reason, and new sign-ins are returned once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRequest' }
+      responses:
+        '200':
+          description: What was created and what was skipped
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportResult' }
+
   /teams/{teamId}/fixtures:
     parameters: [{ $ref: '#/components/parameters/teamId' }]
     post:
@@ -849,6 +865,53 @@ components:
         format: { $ref: '#/components/schemas/SquadFormat' }
         durationMinutes: { type: integer }
         periods: { type: integer }
+
+    ImportRow:
+      type: object
+      required: [firstName, lastName]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        shirtNumber: { type: integer }
+        positions: { type: array, items: { type: string, enum: [GK, DEF, MID, FWD] } }
+        guardianEmail: { type: string }
+        guardianFirstName: { type: string }
+        guardianLastName: { type: string }
+
+    ImportRequest:
+      type: object
+      required: [players, createLogins]
+      properties:
+        players: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/ImportRow' } }
+        createLogins: { type: boolean }
+
+    ImportResult:
+      type: object
+      required: [created, guardiansLinked, skipped, logins]
+      properties:
+        created: { type: integer }
+        guardiansLinked: { type: integer }
+        skipped:
+          type: array
+          items:
+            type: object
+            required: [index, name, reason]
+            properties:
+              index: { type: integer }
+              name: { type: string }
+              reason: { type: string }
+        logins:
+          type: array
+          items:
+            type: object
+            required: [name, email, password, role]
+            properties:
+              name: { type: string }
+              email: { type: string }
+              password: { type: string }
+              role: { type: string }
 
     PlayerStats:
       type: object

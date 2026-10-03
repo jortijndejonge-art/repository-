@@ -3,6 +3,8 @@ import type {
   ChatThread,
   ChatUnread,
   EventKind,
+  ImportRequest,
+  ImportResult,
   PlayerStats,
   Briefing,
   BriefingRead,
@@ -72,6 +74,8 @@ export interface ApiClient {
   addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
   updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
   deleteFixture(fixtureId: Id): Promise<void>;
+  /** Manager: bulk-add players from a spreadsheet. Bad rows are skipped with a reason, not fatal. */
+  importPlayers(teamId: Id, request: ImportRequest): Promise<ImportResult>;
   /** Manager: attendance, availability and minutes for each player in a team. */
   getTeamStats(teamId: Id): Promise<PlayerStats[]>;
   /** The pre-match briefing, or null. `memberId` asks on behalf of a child. */
