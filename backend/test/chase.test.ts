@@ -100,6 +100,19 @@ describe('ChaseService.chase', () => {
     expect(parent.text).toContain('https://club.test/myhockey/');
   });
 
+  it('still posts the reminder, and emails the others, when one email cannot be sent', async () => {
+    const { make, mailer, messages } = setup();
+    const original = mailer.send.bind(mailer);
+    mailer.send = async (mail) => {
+      if (mail.to === 'ann@x.com') throw new Error('mailbox unavailable');
+      return original(mail);
+    };
+    const result = await make(true).chase('f1');
+    expect(result.reminded).toBe(3);
+    expect(messages).toHaveLength(1);
+    expect(mailer.sent.map((m) => m.to).sort()).toEqual(['cy@x.com', 'pat@x.com']);
+  });
+
   it('refuses a match that does not exist', async () => {
     await expect(setup().make(false).chase('nope')).rejects.toMatchObject({ statusCode: 404 });
   });

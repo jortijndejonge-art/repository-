@@ -53,7 +53,8 @@ export class ChaseService {
       `Reminder: can you play ${team?.name ?? 'the team'} v ${fixture.opponent} on ${when(fixture.startsAt)}? ` +
       `Still waiting on ${names.join(', ')}. Players answer under Matches; parents under My children.`;
     await this.repo.addEventMessage({ kind: 'match', eventId: fixtureId, teamId: fixture.teamId, authorId: null, body: text, system: true });
-    if (this.emailEnabled) await this.email(fixture, waiting);
+    // The chat reminder is the main thing; email is a bonus and must never make the reminder fail.
+    if (this.emailEnabled) await this.email(fixture, waiting).catch(() => undefined);
     return { reminded: waiting.length, names };
   }
 
@@ -86,11 +87,14 @@ export class ChaseService {
       for (const r of recipients) {
         if (!r || sent.has(r.email)) continue;
         sent.add(r.email);
-        await this.mailer.send({
-          to: r.email,
-          subject,
-          text: `Hi ${r.name},\n\n${r.about ? `Please say whether ${r.about} can play` : 'Please say whether you can play'} v ${fixture.opponent} on ${when(fixture.startsAt)}.\n\nAnswer here: ${link}\n`,
-        });
+        // One bad address must not stop the others being emailed.
+        await this.mailer
+          .send({
+            to: r.email,
+            subject,
+            text: `Hi ${r.name},\n\n${r.about ? `Please say whether ${r.about} can play` : 'Please say whether you can play'} v ${fixture.opponent} on ${when(fixture.startsAt)}.\n\nAnswer here: ${link}\n`,
+          })
+          .catch(() => undefined);
       }
     }
   }

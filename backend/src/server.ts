@@ -26,7 +26,11 @@ if (!resend && !smtp && process.env.NODE_ENV === 'production') {
   console.warn('[mail] No email provider is configured: emails will only be printed here, not sent.');
 }
 
-const app = buildApp({ repo: new PgRepository(pool), mailer, emailEnabled: Boolean(resend || smtp), config, payments, logger: true });
+// Reminder emails only go out when a real provider is set up. MAIL_FROM alone points at this server's own mail
+// service, which cannot send, so it does not count.
+const emailEnabled = Boolean(resend || process.env.SMTP_HOST);
+
+const app = buildApp({ repo: new PgRepository(pool), mailer, emailEnabled, config, payments, logger: true });
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' });
 
