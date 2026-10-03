@@ -211,6 +211,8 @@ export interface Repository {
   createSession(tokenHash: string, memberId: Id, expiresAt: Date): Promise<void>;
   getSessionMember(tokenHash: string): Promise<Id | null>;
   deleteSession(tokenHash: string): Promise<void>;
+  /** Sign a member out everywhere except the session with this token hash. */
+  deleteSessionsExcept(memberId: Id, keepTokenHash: string): Promise<void>;
 }
 
 type Row = Record<string, any>;
@@ -1194,6 +1196,10 @@ export class PgRepository implements Repository {
 
   async setPasswordHash(memberId: Id, hash: string) {
     await this.pool.query('UPDATE members SET password_hash = $2 WHERE id = $1', [memberId, hash]);
+  }
+
+  async deleteSessionsExcept(memberId: Id, keepTokenHash: string) {
+    await this.pool.query('DELETE FROM sessions WHERE member_id = $1 AND token_hash <> $2', [memberId, keepTokenHash]);
   }
 
   async createSession(tokenHash: string, memberId: Id, expiresAt: Date) {

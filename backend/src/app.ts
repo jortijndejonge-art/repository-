@@ -102,7 +102,8 @@ const trainingProps = {
 const strategy = { enum: ['fair', 'strongest', 'stamina'] } as const;
 
 export function buildApp({ repo, mailer, emailEnabled = false, config, payments = new DisabledProvider(), logger = false }: AppDeps): FastifyInstance {
-  const app = Fastify({ logger });
+  // Behind Apache on this machine only, so the forwarded address is the visitor's, and is what sign-in limits use.
+  const app = Fastify({ logger, trustProxy: true });
   const auth = new AuthService(repo, mailer, config);
   const access = new Access(repo);
   const lineups = new LineupService(repo, mailer, config.appUrl);
@@ -155,7 +156,7 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
           },
         },
         async (req, reply) => {
-          const link = await auth.requestSignIn(req.body.email);
+          const link = await auth.requestSignIn(req.body.email, req.ip);
           reply.code(202);
           return config.exposeDevLinks && link ? { sent: true, devLink: link } : { sent: true };
         },
@@ -185,7 +186,7 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
             },
           },
         },
-        async (req) => auth.loginWithPassword(req.body.email, req.body.password),
+        async (req) => auth.loginWithPassword(req.body.email, req.body.password, req.ip),
       );
 
       api.put<{ Body: { currentPassword?: string; newPassword: string } }>(
@@ -203,7 +204,7 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
           },
         },
         async (req, reply) => {
-          await auth.setPassword(await signedIn(req), req.body.newPassword, req.body.currentPassword);
+          await auth.setPassword(await signedIn(req), req.body.newPassword, req.body.currentPassword, req.accessToken);
           return reply.code(204).send();
         },
       );

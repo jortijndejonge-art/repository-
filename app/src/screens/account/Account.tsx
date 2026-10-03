@@ -27,7 +27,7 @@ export function Account({ me }: { me: Me }) {
       setCurrent('');
       setNext('');
       setAgain('');
-      toast('Password saved');
+      toast('Password saved. Your other devices have been signed out.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the password');
     } finally {

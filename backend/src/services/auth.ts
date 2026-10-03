@@ -5,16 +5,21 @@ import { hashToken, newToken } from '../auth/tokens';
 import type { Mailer } from './mailer';
 import { generatePassword, hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '../auth/password';
 import { badRequest, conflict, HttpError, notFound, unauthorized } from './errors';
+import { Throttle } from './throttle';
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 
-/** Password guesses allowed per email address before a short lockout. */
-const MAX_FAILED_LOGINS = 8;
+/** Wrong guesses allowed in the window, for one email address and for one internet address, before a lockout. */
+const MAX_FAILED_PER_EMAIL = 8;
+const MAX_FAILED_PER_IP = 40;
 const LOCKOUT_MINUTES = 15;
+/** Sign-in emails: a few per address per quarter hour, and a cap per internet address, so the form cannot spam anyone. */
+const MAX_LINKS_PER_EMAIL = 3;
+const MAX_LINKS_PER_IP = 30;
 
 export class AuthService {
-  private readonly failedLogins = new Map<string, { count: number; until: number }>();
+  private readonly throttle = new Throttle();
 
   constructor(
     private readonly repo: Repository,
@@ -54,7 +59,11 @@ export class AuthService {
    * Request a sign-in link by email. Always succeeds from the caller's point of
    * view so the endpoint can't be used to discover who is a member.
    */
-  async requestSignIn(email: string): Promise<string | null> {
+  async requestSignIn(email: string, ip = 'unknown'): Promise<string | null> {
+    // Over the limit looks exactly like any other answer, but no email is sent.
+    const asked = email.trim().toLowerCase();
+    if (!this.throttle.allow(`link:${asked}`, MAX_LINKS_PER_EMAIL, LOCKOUT_MINUTES * MINUTE)) return null;
+    if (!this.throttle.allow(`link-ip:${ip}`, MAX_LINKS_PER_IP, 60 * MINUTE)) return null;
     const [member] = await this.repo.findMembersByEmail(email);
     if (!member?.email) return null;
     return this.sendMagicLink(member.id, member.email);
@@ -74,12 +83,14 @@ export class AuthService {
   }
 
   /** Sign in with an email and password. Wrong email and wrong password look the same. */
-  async loginWithPassword(email: string, password: string): Promise<AuthSession> {
-    const key = email.trim().toLowerCase();
-    const attempts = this.failedLogins.get(key);
-    if (attempts && attempts.count >= MAX_FAILED_LOGINS && attempts.until > Date.now()) {
+  async loginWithPassword(email: string, password: string, ip = 'unknown'): Promise<AuthSession> {
+    const emailKey = `login:${email.trim().toLowerCase()}`;
+    const ipKey = `login-ip:${ip}`;
+    const window = LOCKOUT_MINUTES * MINUTE;
+    if (this.throttle.count(emailKey, window) >= MAX_FAILED_PER_EMAIL || this.throttle.count(ipKey, window) >= MAX_FAILED_PER_IP) {
       throw new HttpError(429, `Too many attempts. Try again in ${LOCKOUT_MINUTES} minutes, or use an email link.`);
     }
+    const key = email.trim().toLowerCase();
     let memberId: Id | null = null;
     const candidates = await this.repo.findMembersByEmail(key);
     for (const member of candidates.length ? candidates : [null]) {
@@ -87,24 +98,35 @@ export class AuthService {
       if ((await verifyPassword(password, hash)) && member) memberId = member.id;
     }
     if (!memberId) {
-      const count = (attempts && attempts.until > Date.now() ? attempts.count : 0) + 1;
-      this.failedLogins.set(key, { count, until: Date.now() + LOCKOUT_MINUTES * MINUTE });
+      this.throttle.record(emailKey);
+      this.throttle.record(ipKey);
       throw unauthorized('Wrong email or password');
     }
-    this.failedLogins.delete(key);
+    this.throttle.clear(emailKey);
     return this.startSession(memberId);
   }
 
   /** Set or change your password. Changing an existing one needs the current password. */
-  async setPassword(memberId: Id, newPassword: string, currentPassword?: string): Promise<void> {
+  async setPassword(memberId: Id, newPassword: string, currentPassword?: string, keepSessionToken?: string): Promise<void> {
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
       throw badRequest(`Choose a password of at least ${MIN_PASSWORD_LENGTH} characters`);
     }
     const existing = await this.repo.getPasswordHash(memberId);
-    if (existing && !(await verifyPassword(currentPassword ?? '', existing))) {
-      throw unauthorized('Your current password is wrong');
+    if (existing) {
+      // Someone holding a stolen session must not be able to guess the current password without limit.
+      const key = `password:${memberId}`;
+      if (this.throttle.count(key, LOCKOUT_MINUTES * MINUTE) >= MAX_FAILED_PER_EMAIL) {
+        throw new HttpError(429, `Too many attempts. Try again in ${LOCKOUT_MINUTES} minutes.`);
+      }
+      if (!(await verifyPassword(currentPassword ?? '', existing))) {
+        this.throttle.record(key);
+        throw unauthorized('Your current password is wrong');
+      }
+      this.throttle.clear(key);
     }
     await this.repo.setPasswordHash(memberId, await hashPassword(newPassword));
+    // A new password signs every other device out, in case the old one had leaked.
+    if (keepSessionToken) await this.repo.deleteSessionsExcept(memberId, hashToken(keepSessionToken));
   }
 
   /**
