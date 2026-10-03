@@ -204,6 +204,19 @@ uploaded with `VITE_API=http`, so it now uses the real backend. Set the `VITE_AP
 before turning on the automatic deploy, otherwise the next automatic deploy would put the site back
 into demo mode.
 
+## Security on the server
+
+- The site and the API are served with `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, a
+  restrained `Referrer-Policy` and a `Permissions-Policy` that turns off camera, microphone and location. They are
+  set in the same Apache file (`vhost_ssl.conf`, backup `vhost_ssl.conf.bak-myhockey-headers`) inside a
+  `<Location /myhockey>` block.
+- The API listens only on `127.0.0.1:3010` and trusts Apache's forwarded address, which the sign-in limits use. The
+  database listens only on `127.0.0.1:5433` and its password is in `/etc/myhockey.env` (root only).
+- Sign-in: 8 wrong guesses per email address or 40 per internet address in 15 minutes gives a 15 minute lockout.
+  Emailed links: 3 per address per 15 minutes. Changing a password signs other devices out.
+- Worth doing when convenient: run the API as an ordinary user instead of root (it currently runs under pm2 as root,
+  like the other apps on this server), and change the root password that was shared during setup.
+
 ## Switching on Stripe payments (later)
 
 Membership payments are built and tested, and stay **off** until a Stripe account is connected.
