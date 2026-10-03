@@ -188,6 +188,27 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/MembershipPlan' } }
 
+  /teams/{teamId}:
+    parameters: [{ $ref: '#/components/parameters/teamId' }]
+    patch:
+      summary: Rename a team or change its age group or usual format (club admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                ageGroup: { type: string, enum: [U8, U10, U12, U14, U16, U18, Adult] }
+                defaultFormat: { $ref: '#/components/schemas/SquadFormat' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Team' }
+
   /clubs/{clubId}/teams:
     parameters: [{ $ref: '#/components/parameters/clubId' }]
     get:

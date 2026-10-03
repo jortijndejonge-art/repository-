@@ -72,6 +72,8 @@ export interface Repository {
   // Clubs, teams, members
   getClub(id: Id): Promise<Club | null>;
   listClubTeams(clubId: Id): Promise<Team[]>;
+  addTeam(clubId: Id, team: { name: string; ageGroup: Team['ageGroup']; defaultFormat: SquadFormat }): Promise<Team>;
+  updateTeam(id: Id, patch: { name?: string; ageGroup?: Team['ageGroup']; defaultFormat?: SquadFormat }): Promise<Team | null>;
   getTeam(id: Id): Promise<Team | null>;
   getMember(id: Id): Promise<Member | null>;
   findMembersByEmail(email: string): Promise<Member[]>;
@@ -390,6 +392,23 @@ export class PgRepository implements Repository {
 
   listClubTeams(clubId: Id) {
     return this.many('SELECT * FROM teams WHERE club_id = $1 ORDER BY name', [clubId], toTeam);
+  }
+
+  async addTeam(clubId: Id, t: { name: string; ageGroup: Team['ageGroup']; defaultFormat: SquadFormat }) {
+    const { rows } = await this.pool.query(
+      'INSERT INTO teams (club_id, name, age_group, default_format) VALUES ($1, $2, $3, $4) RETURNING *',
+      [clubId, t.name, t.ageGroup, t.defaultFormat],
+    );
+    return toTeam(rows[0]);
+  }
+
+  updateTeam(id: Id, patch: { name?: string; ageGroup?: Team['ageGroup']; defaultFormat?: SquadFormat }) {
+    return this.one(
+      `UPDATE teams SET name = COALESCE($2, name), age_group = COALESCE($3, age_group), default_format = COALESCE($4, default_format)
+        WHERE id = $1 RETURNING *`,
+      [id, patch.name ?? null, patch.ageGroup ?? null, patch.defaultFormat ?? null],
+      toTeam,
+    );
   }
 
   getTeam(id: Id) {

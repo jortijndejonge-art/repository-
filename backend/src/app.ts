@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type {
+  AgeGroup,
   AvailabilityStatus,
   FixtureUpdate,
   Id,
@@ -35,6 +36,7 @@ import { LineupService } from './services/lineups';
 import { ChaseService } from './services/chase';
 import { ChatService } from './services/chat';
 import { LeagueService } from './services/leagues';
+import { TeamService } from './services/teams';
 import { LiveService } from './services/live';
 import { ScheduleService } from './services/schedule';
 import { TrainingService } from './services/training';
@@ -113,6 +115,7 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
   const importer = new ImportService(repo, auth);
   const schedule = new ScheduleService(repo);
   const leagues = new LeagueService(repo);
+  const teamService = new TeamService(repo);
   const chaser = new ChaseService(repo, mailer, config.appUrl, emailEnabled);
   const briefings = new BriefingService(repo);
   const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
@@ -303,6 +306,34 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
         async (req) => {
           await access.requireManager(await signedIn(req), req.params.teamId);
           return importer.run(req.params.teamId, req.body);
+        },
+      );
+
+      const teamProps = {
+        name: { type: 'string', minLength: 1, maxLength: 60 },
+        ageGroup: { enum: ['U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'Adult'] },
+        defaultFormat: { enum: [5, 7, 11] },
+      } as const;
+
+      api.post<{ Params: { clubId: Id }; Body: { name: string; ageGroup: AgeGroup; defaultFormat: SquadFormat } }>(
+        '/clubs/:clubId/teams',
+        { schema: { body: { type: 'object', required: ['name', 'ageGroup', 'defaultFormat'], additionalProperties: false, properties: teamProps } } },
+        async (req, reply) => {
+          const admin = await signedIn(req);
+          await access.requireClubAdmin(admin, req.params.clubId);
+          reply.code(201);
+          return teamService.create(req.params.clubId, admin, req.body);
+        },
+      );
+
+      api.patch<{ Params: { teamId: Id }; Body: { name?: string; ageGroup?: AgeGroup; defaultFormat?: SquadFormat } }>(
+        '/teams/:teamId',
+        { schema: { body: { type: 'object', additionalProperties: false, properties: teamProps } } },
+        async (req) => {
+          const team = await repo.getTeam(req.params.teamId);
+          if (!team) throw notFound('Team not found');
+          await access.requireClubAdmin(await signedIn(req), team.clubId);
+          return teamService.update(team.id, req.body);
         },
       );
 
