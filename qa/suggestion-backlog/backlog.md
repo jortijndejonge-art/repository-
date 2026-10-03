@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0023**
+Next free id: **BL-0024**
 
 ---
+
+## BL-0023 — Pitches, weekly openings, clash warnings and a club schedule (Phase 4a)
+- **Date:** 2026-10-03
+- **Source task:** Plan, Phase 4a: "each club publishes pitch availability: which slots, which age groups, which times; manual/assisted fixture entry with conflict detection; manage all age groups in one place"
+- **Idea:** Admins add the club's pitches and the weekly times each is open, per age group (Pitches tab). Home matches can be booked on a pitch. Adding or editing a match checks, as you type, for a pitch already booked then (including 10 minutes' turnaround), the team already playing or training, and a time outside the pitch's openings for that age group; each is explained in plain words, and the manager can still "Save anyway". The form suggests the earliest free times for the team's age group and match length, one tap to take one. A Club schedule tab shows every team's week with the pitch, free time left in each opening, and any clash highlighted.
+- **Rationale:** This proves the data model (pitches, slots, age groups, bookings) before the season scheduler automates it, as the plan says.
+- **Effort estimate:** L
+- **Owning agent:** A/B (migration 013, schedule service and routes), C (Pitches, Club schedule, fixture form), shared engine (clash and free-time maths)
+- **Status:** Approved — continuing the plan, as the owner asked.
+- **Outcome (2026-10-03):** Done, committed in 9b477de and live. 14 engine tests (including UK summer and winter time, and the day the clocks change), 6 service tests, a live run with throwaway data (pitch and opening created; admin-only enforced; same-time booking refused with the reason; 50 minutes later is fine; 15:00 flagged as outside the opening; forcing works; the club schedule is for managers only), and tried in a browser. The pitches start empty, so nothing about existing matches changes until a club adds them. Times use the club's time zone, Europe/London for now. Not built yet: the automatic season scheduler (Phase 4b), away-match travel, and pitch bookings for training.
 
 ## BL-0022 — Automatic availability chasing
 - **Date:** 2026-10-03
