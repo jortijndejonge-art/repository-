@@ -6,6 +6,8 @@ import type {
   Lineup,
   NewCustomFormation,
   ImportRequest,
+  ApplyMatch,
+  LeagueConfig,
   NewAnnouncement,
   NewPitchSlot,
   NewBriefing,
@@ -32,6 +34,7 @@ import { ImportService } from './services/importer';
 import { LineupService } from './services/lineups';
 import { ChaseService } from './services/chase';
 import { ChatService } from './services/chat';
+import { LeagueService } from './services/leagues';
 import { LiveService } from './services/live';
 import { ScheduleService } from './services/schedule';
 import { TrainingService } from './services/training';
@@ -108,6 +111,7 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
   const live = new LiveService(repo);
   const importer = new ImportService(repo, auth);
   const schedule = new ScheduleService(repo);
+  const leagues = new LeagueService(repo);
   const chaser = new ChaseService(repo, mailer, config.appUrl, emailEnabled);
   const briefings = new BriefingService(repo);
   const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
@@ -886,6 +890,138 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
           const to = new Date(req.query.to);
           if (to.getTime() - from.getTime() > 120 * 86_400_000) throw badRequest('Ask for 120 days or fewer at a time');
           return repo.listClubFixtures(req.params.clubId, from, to);
+        },
+      );
+
+      // ---- Season plans (Phase 4b) --------------------------------------------------
+      const date = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } as const;
+      const leagueConfig = {
+        type: 'object',
+        required: ['firstDate', 'lastDate', 'weekday', 'excludedDates', 'doubleRound', 'divisions', 'opponents'],
+        additionalProperties: false,
+        properties: {
+          firstDate: date,
+          lastDate: date,
+          weekday: { type: 'integer', minimum: 0, maximum: 6 },
+          excludedDates: { type: 'array', maxItems: 60, items: date },
+          doubleRound: { type: 'boolean' },
+          divisions: {
+            type: 'array',
+            maxItems: 20,
+            items: {
+              type: 'object',
+              required: ['name', 'ageGroup'],
+              additionalProperties: false,
+              properties: {
+                name: { type: 'string', minLength: 1, maxLength: 60 },
+                ageGroup: { enum: ['U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'Adult'] },
+                ourTeamId: { type: 'string', maxLength: 80 },
+                durationMinutes: { type: 'integer', minimum: 5, maximum: 240 },
+              },
+            },
+          },
+          opponents: {
+            type: 'array',
+            maxItems: 30,
+            items: {
+              type: 'object',
+              required: ['id', 'name', 'miles', 'slots', 'divisions'],
+              additionalProperties: false,
+              properties: {
+                id: { type: 'string', minLength: 1, maxLength: 60 },
+                name: { type: 'string', minLength: 1, maxLength: 80 },
+                miles: { type: 'number', minimum: 0, maximum: 1000 },
+                divisions: { type: 'array', maxItems: 20, items: { type: 'string', maxLength: 60 } },
+                slots: {
+                  type: 'array',
+                  maxItems: 30,
+                  items: {
+                    type: 'object',
+                    required: ['weekday', 'startMinute', 'endMinute', 'ageGroups'],
+                    additionalProperties: false,
+                    properties: {
+                      weekday: { type: 'integer', minimum: 0, maximum: 6 },
+                      startMinute: { type: 'integer', minimum: 0, maximum: 1439 },
+                      endMinute: { type: 'integer', minimum: 1, maximum: 1440 },
+                      ageGroups: { type: 'array', minItems: 1, items: { enum: ['U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'Adult'] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      } as const;
+
+      api.get<{ Params: { clubId: Id } }>('/clubs/:clubId/leagues', async (req) => {
+        await access.requireClubAdmin(await signedIn(req), req.params.clubId);
+        return repo.listLeagues(req.params.clubId);
+      });
+
+      api.post<{ Params: { clubId: Id }; Body: { name: string; config: LeagueConfig } }>(
+        '/clubs/:clubId/leagues',
+        { schema: { body: { type: 'object', required: ['name', 'config'], additionalProperties: false, properties: { name: { type: 'string', minLength: 1, maxLength: 80 }, config: leagueConfig } } } },
+        async (req, reply) => {
+          await access.requireClubAdmin(await signedIn(req), req.params.clubId);
+          reply.code(201);
+          return repo.addLeague(req.params.clubId, req.body.name.trim(), req.body.config);
+        },
+      );
+
+      api.put<{ Params: { leagueId: Id }; Body: { name?: string; config?: LeagueConfig } }>(
+        '/leagues/:leagueId',
+        { schema: { body: { type: 'object', additionalProperties: false, properties: { name: { type: 'string', minLength: 1, maxLength: 80 }, config: leagueConfig } } } },
+        async (req) => {
+          const league = await leagues.league(req.params.leagueId);
+          await access.requireClubAdmin(await signedIn(req), league.clubId);
+          return (await repo.updateLeague(league.id, { name: req.body.name?.trim(), config: req.body.config })) ?? Promise.reject(notFound());
+        },
+      );
+
+      api.delete<{ Params: { leagueId: Id } }>('/leagues/:leagueId', async (req, reply) => {
+        const league = await leagues.league(req.params.leagueId);
+        await access.requireClubAdmin(await signedIn(req), league.clubId);
+        await repo.deleteLeague(league.id);
+        return reply.code(204).send();
+      });
+
+      // Create fixtures for our own teams from a planned season. Matches already in a team's list are skipped.
+      api.post<{ Params: { leagueId: Id }; Body: { matches: ApplyMatch[] } }>(
+        '/leagues/:leagueId/apply',
+        {
+          bodyLimit: 1_000_000,
+          schema: {
+            body: {
+              type: 'object',
+              required: ['matches'],
+              additionalProperties: false,
+              properties: {
+                matches: {
+                  type: 'array',
+                  maxItems: 400,
+                  items: {
+                    type: 'object',
+                    required: ['teamId', 'opponent', 'homeAway', 'startsAt', 'durationMinutes', 'venue'],
+                    additionalProperties: false,
+                    properties: {
+                      teamId: { type: 'string' },
+                      opponent: fixtureProps.opponent,
+                      homeAway: fixtureProps.homeAway,
+                      startsAt: fixtureProps.startsAt,
+                      durationMinutes: fixtureProps.durationMinutes,
+                      pitchId: fixtureProps.pitchId,
+                      venue: fixtureProps.venue,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        async (req) => {
+          const league = await leagues.league(req.params.leagueId);
+          await access.requireClubAdmin(await signedIn(req), league.clubId);
+          return leagues.apply(league.id, req.body.matches);
         },
       );
 

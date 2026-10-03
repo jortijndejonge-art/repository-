@@ -355,6 +355,72 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/PlayerStats' } }
 
+  /clubs/{clubId}/leagues:
+    parameters: [{ $ref: '#/components/parameters/clubId' }]
+    get:
+      summary: The club's saved season plans (admin)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/League' } }
+    post:
+      summary: Save a new season plan set-up (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewLeague' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/League' }
+
+  /leagues/{leagueId}:
+    parameters:
+      - { name: leagueId, in: path, required: true, schema: { type: string } }
+    put:
+      summary: Change a season plan's name or set-up (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewLeague' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/League' }
+    delete:
+      summary: Delete a season plan (admin). Fixtures already created from it stay.
+      responses:
+        '204': { description: Deleted }
+
+  /leagues/{leagueId}/apply:
+    parameters:
+      - { name: leagueId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Create fixtures for the club's own teams from a planned season (admin). Matches a team already has at that time are skipped, so it is safe to apply twice.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [matches]
+              properties:
+                matches: { type: array, maxItems: 400, items: { $ref: '#/components/schemas/ApplyMatch' } }
+      responses:
+        '200':
+          description: How many were created and skipped
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplyResult' }
+
   /fixtures/{fixtureId}/chase:
     parameters:
       - { name: fixtureId, in: path, required: true, schema: { type: string } }
@@ -883,6 +949,82 @@ components:
         format: { $ref: '#/components/schemas/SquadFormat' }
         durationMinutes: { type: integer }
         periods: { type: integer }
+
+    LeagueOpponent:
+      type: object
+      required: [id, name, miles, slots, divisions]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        miles: { type: number, description: Miles from our club }
+        slots: { type: array, items: { $ref: '#/components/schemas/NewPitchSlot' } }
+        divisions: { type: array, items: { type: string } }
+
+    NewPitchSlot:
+      type: object
+      required: [weekday, startMinute, endMinute, ageGroups]
+      properties:
+        weekday: { type: integer, minimum: 0, maximum: 6 }
+        startMinute: { type: integer }
+        endMinute: { type: integer }
+        ageGroups: { type: array, items: { type: string, enum: [U8, U10, U12, U14, U16, U18, Adult] } }
+
+    LeagueConfig:
+      type: object
+      required: [firstDate, lastDate, weekday, excludedDates, doubleRound, divisions, opponents]
+      properties:
+        firstDate: { type: string, description: 'YYYY-MM-DD' }
+        lastDate: { type: string }
+        weekday: { type: integer, minimum: 0, maximum: 6 }
+        excludedDates: { type: array, items: { type: string } }
+        doubleRound: { type: boolean }
+        divisions:
+          type: array
+          items:
+            type: object
+            required: [name, ageGroup]
+            properties:
+              name: { type: string }
+              ageGroup: { type: string, enum: [U8, U10, U12, U14, U16, U18, Adult] }
+              ourTeamId: { type: string }
+              durationMinutes: { type: integer }
+        opponents: { type: array, items: { $ref: '#/components/schemas/LeagueOpponent' } }
+
+    League:
+      type: object
+      required: [id, clubId, name, config, updatedAt]
+      properties:
+        id: { type: string }
+        clubId: { type: string }
+        name: { type: string }
+        config: { $ref: '#/components/schemas/LeagueConfig' }
+        updatedAt: { type: string, format: date-time }
+
+    NewLeague:
+      type: object
+      required: [name, config]
+      properties:
+        name: { type: string }
+        config: { $ref: '#/components/schemas/LeagueConfig' }
+
+    ApplyMatch:
+      type: object
+      required: [teamId, opponent, homeAway, startsAt, durationMinutes, venue]
+      properties:
+        teamId: { type: string }
+        opponent: { type: string }
+        homeAway: { type: string, enum: [home, away] }
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer }
+        pitchId: { type: string }
+        venue: { type: string }
+
+    ApplyResult:
+      type: object
+      required: [created, skipped]
+      properties:
+        created: { type: integer }
+        skipped: { type: integer }
 
     ImportRow:
       type: object

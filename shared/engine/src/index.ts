@@ -6,3 +6,6 @@ export * from './subplan';
 export * from './rotation';
 export * from './importer';
 export * from './schedule';
+export * from './season';
+export { leagueToSeasonInput, ourMatches, seasonDates, usualMinutes, describeStart } from './league';
+export type { OurClub, LeaguePlanInput } from './league';

@@ -186,6 +186,76 @@ export interface ClubFixture extends Fixture {
 }
 
 // ---------------------------------------------------------------------------
+// Season planning (Phase 4b)
+// ---------------------------------------------------------------------------
+
+/** Another club in the league, typed in by hand: where it is and when its pitch is open. */
+export interface LeagueOpponent {
+  id: string;
+  name: string;
+  /** Miles from our club, to balance travel. */
+  miles: number;
+  /** When their pitch can host matches (weekly, local time). */
+  slots: NewPitchSlot[];
+  /** The names of the divisions they enter a team in. */
+  divisions: string[];
+}
+
+/** One group of teams that play each other, such as "U12 Boys". */
+export interface LeagueDivision {
+  name: string;
+  ageGroup: AgeGroup;
+  /** Our team in this division, if we have one. */
+  ourTeamId?: Id;
+  /** Match length; the usual one for the age group if left out. */
+  durationMinutes?: number;
+}
+
+export interface LeagueConfig {
+  /** First and last date matches may be played, as YYYY-MM-DD. */
+  firstDate: string;
+  lastDate: string;
+  /** Matches are on this weekday (Monday = 0 … Sunday = 6), except on `excludedDates`. */
+  weekday: number;
+  excludedDates: string[];
+  /** Everyone plays everyone home and away. */
+  doubleRound: boolean;
+  divisions: LeagueDivision[];
+  opponents: LeagueOpponent[];
+}
+
+export interface League {
+  id: Id;
+  clubId: Id;
+  name: string;
+  config: LeagueConfig;
+  updatedAt: IsoDateTime;
+}
+
+export interface NewLeague {
+  name: string;
+  config: LeagueConfig;
+}
+
+/** A planned match for one of our teams, ready to become a fixture. */
+export interface ApplyMatch {
+  teamId: Id;
+  opponent: string;
+  homeAway: 'home' | 'away';
+  startsAt: IsoDateTime;
+  durationMinutes: number;
+  /** Our pitch, for home matches. */
+  pitchId?: Id;
+  venue: string;
+}
+
+export interface ApplyResult {
+  created: number;
+  /** Matches that were already in the fixture list. */
+  skipped: number;
+}
+
+// ---------------------------------------------------------------------------
 // Availability chasing
 // ---------------------------------------------------------------------------
 

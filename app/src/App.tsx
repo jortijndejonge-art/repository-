@@ -16,6 +16,7 @@ import { LineupPlanner } from './screens/lineup/LineupPlanner';
 import { Matchday } from './screens/matchday/Matchday';
 import { Pitches } from './screens/pitches/Pitches';
 import { Schedule } from './screens/schedule/Schedule';
+import { SeasonPlanner } from './screens/season/SeasonPlanner';
 import { Account } from './screens/account/Account';
 import { Membership } from './screens/membership/Membership';
 import { Squad } from './screens/squad/Squad';
@@ -56,7 +57,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-export type Tab = 'chats' | 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'schedule' | 'pitches' | 'matchday' | 'stats' | 'training' | 'membership' | 'account';
+export type Tab = 'chats' | 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'schedule' | 'pitches' | 'season' | 'matchday' | 'stats' | 'training' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -95,6 +96,7 @@ function Shell({ me }: { me: Me }) {
     ...(canManage ? [{ id: 'fixtures' as const, label: 'Fixtures' }] : []),
     ...(canManage ? [{ id: 'schedule' as const, label: 'Club schedule' }] : []),
     ...(isClubAdmin(me) ? [{ id: 'pitches' as const, label: 'Pitches' }] : []),
+    ...(isClubAdmin(me) ? [{ id: 'season' as const, label: 'Season planner' }] : []),
     ...(canManage ? [{ id: 'matchday' as const, label: 'Matchday' }] : []),
     ...(canManage || plays ? [{ id: 'training' as const, label: 'Training' }] : []),
     ...(canManage ? [{ id: 'stats' as const, label: 'Stats' }] : []),
@@ -159,6 +161,7 @@ function Shell({ me }: { me: Me }) {
       {tab === 'fixtures' && canManage && <Fixtures me={me} />}
       {tab === 'schedule' && canManage && <Schedule me={me} />}
       {tab === 'pitches' && isClubAdmin(me) && <Pitches me={me} />}
+      {tab === 'season' && isClubAdmin(me) && <SeasonPlanner me={me} />}
       {tab === 'matchday' && canManage && <Matchday me={me} />}
       {tab === 'training' && <Training me={me} />}
       {tab === 'stats' && canManage && <Stats me={me} />}

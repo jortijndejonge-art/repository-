@@ -1,4 +1,4 @@
-import type { ChaseResult, ClubFixture, Pitch, PitchSlot, ChatMessage, EventKind, ImportResult, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { ApplyResult, ChaseResult, ClubFixture, League, Pitch, PitchSlot, ChatMessage, EventKind, ImportResult, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
 import { findConflicts, benchNow, pitchAt, secondsPlayed, minutesFromPlan, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
@@ -17,6 +17,7 @@ export function createMockClient(): ApiClient {
   const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
   const announcements: Announcement[] = [];
   const pitches: Pitch[] = [];
+  const leagues: League[] = [];
   const briefings = new Map<Id, Briefing>();
   const briefingSeen = new Map<string, string>(); // "fixtureId/memberId" -> when read
   // Live matches: playing time banked before the clock was last started, and when it was started (ms).
@@ -427,6 +428,54 @@ export function createMockClient(): ApiClient {
     },
     async checkFixtureConflicts(teamId, candidate) {
       return delay(conflictsFor(teamId, candidate));
+    },
+    async getLeagues() {
+      return delay(leagues.map((l) => structuredClone(l)));
+    },
+    async addLeague(clubId, input) {
+      const created: League = { id: `league-${Date.now().toString(36)}`, clubId, name: input.name, config: structuredClone(input.config), updatedAt: new Date().toISOString() };
+      leagues.push(created);
+      return delay(structuredClone(created));
+    },
+    async updateLeague(id, update) {
+      const league = leagues.find((l) => l.id === id);
+      if (!league) throw new ApiError(404, 'Season plan not found');
+      if (update.name !== undefined) league.name = update.name;
+      if (update.config !== undefined) league.config = structuredClone(update.config);
+      league.updatedAt = new Date().toISOString();
+      return delay(structuredClone(league));
+    },
+    async deleteLeague(id) {
+      const at = leagues.findIndex((l) => l.id === id);
+      if (at < 0) throw new ApiError(404, 'Season plan not found');
+      leagues.splice(at, 1);
+      return delay(undefined);
+    },
+    async applyLeague(_id, matches) {
+      const result: ApplyResult = { created: 0, skipped: 0 };
+      for (const m of matches) {
+        const team = demo.teams.find((t) => t.id === m.teamId);
+        if (!team) throw new ApiError(400, 'One of those matches is for a team outside this club');
+        if (fixtures.some((f) => f.teamId === m.teamId && new Date(f.startsAt).getTime() === new Date(m.startsAt).getTime())) {
+          result.skipped++;
+          continue;
+        }
+        const created: Fixture = {
+          id: `fx-${Date.now().toString(36)}-${fixtures.length}`,
+          teamId: m.teamId,
+          opponent: m.opponent,
+          startsAt: m.startsAt,
+          venue: m.venue,
+          homeAway: m.homeAway,
+          format: team.defaultFormat,
+          durationMinutes: m.durationMinutes,
+          periods: team.ageGroup === 'U8' ? 2 : 4,
+          ...(m.homeAway === 'home' && m.pitchId ? { pitchId: m.pitchId } : {}),
+        };
+        fixtures.push(created);
+        result.created++;
+      }
+      return delay(result);
     },
     async getPitches() {
       return delay(pitches.map((p) => ({ ...p, slots: p.slots.map((s) => ({ ...s })) })));

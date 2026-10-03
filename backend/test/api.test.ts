@@ -746,3 +746,43 @@ describe('pitches and fixture clashes', () => {
     expect((await app.inject({ method: 'GET', url, headers: as(p) })).statusCode).toBe(403);
   });
 });
+
+describe('season plans', () => {
+  const config = {
+    firstDate: '2030-09-07',
+    lastDate: '2030-12-14',
+    weekday: 5,
+    excludedDates: [],
+    doubleRound: false,
+    divisions: [{ name: 'U12 Boys', ageGroup: 'U12', ourTeamId: 'u12' }],
+    opponents: [{ id: 'north', name: 'Northgate HC', miles: 12, divisions: ['U12 Boys'], slots: [{ weekday: 5, startMinute: 540, endMinute: 780, ageGroups: ['U12'] }] }],
+  };
+
+  it('lets an admin save, change and delete a plan, and creates fixtures from it once', async () => {
+    const coach = await signIn('coach@example.com');
+    const p = await signIn(playerEmail);
+    const club = demo.club.id;
+
+    expect((await app.inject({ method: 'GET', url: `/api/v1/clubs/${club}/leagues`, headers: as(p) })).statusCode).toBe(403);
+    const made = await app.inject({ method: 'POST', url: `/api/v1/clubs/${club}/leagues`, headers: as(coach), payload: { name: 'Autumn', config } });
+    expect(made.statusCode).toBe(201);
+    const league = made.json();
+
+    const renamed = await app.inject({ method: 'PUT', url: `/api/v1/leagues/${league.id}`, headers: as(coach), payload: { name: 'Autumn 2030' } });
+    expect(renamed.json()).toMatchObject({ name: 'Autumn 2030', config: { weekday: 5 } });
+    expect((await app.inject({ method: 'POST', url: `/api/v1/clubs/${club}/leagues`, headers: as(coach), payload: { name: 'Bad', config: { ...config, weekday: 9 } } })).statusCode).toBe(400);
+
+    const matches = [{ teamId: 'u12', opponent: 'Northgate HC U12 Boys', homeAway: 'away', startsAt: '2030-09-07T09:00:00.000Z', durationMinutes: 40, venue: 'Northgate HC' }];
+    const first = await app.inject({ method: 'POST', url: `/api/v1/leagues/${league.id}/apply`, headers: as(coach), payload: { matches } });
+    expect(first.json()).toEqual({ created: 1, skipped: 0 });
+    const again = await app.inject({ method: 'POST', url: `/api/v1/leagues/${league.id}/apply`, headers: as(coach), payload: { matches } });
+    expect(again.json()).toEqual({ created: 0, skipped: 1 });
+
+    const fixtures = (await app.inject({ method: 'GET', url: '/api/v1/teams/u12/fixtures', headers: as(coach) })).json();
+    const created = fixtures.find((f: { opponent: string }) => f.opponent === 'Northgate HC U12 Boys');
+    expect(created).toMatchObject({ homeAway: 'away', venue: 'Northgate HC', format: 7 });
+
+    await app.inject({ method: 'DELETE', url: `/api/v1/fixtures/${created.id}`, headers: as(coach) });
+    expect((await app.inject({ method: 'DELETE', url: `/api/v1/leagues/${league.id}`, headers: as(coach) })).statusCode).toBe(204);
+  });
+});

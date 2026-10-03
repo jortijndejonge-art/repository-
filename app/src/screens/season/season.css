@@ -1,0 +1,225 @@
+.season {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.season p {
+  margin: 0;
+}
+
+.season__new,
+.season__top {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.season__new .field {
+  flex: 1;
+}
+
+.season__top {
+  align-items: center;
+}
+
+.season__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.season__open {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.season__open:hover,
+.season__open:focus-visible {
+  border-color: var(--teal);
+}
+
+.season__heading {
+  margin: 10px 0 0;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.season__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.season__grid--tight {
+  grid-template-columns: repeat(3, 1fr);
+  margin: 6px 0;
+}
+
+.season__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.season__chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.season__chip {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--surface-2);
+}
+
+.season__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.season__groups {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.season__groups legend {
+  padding: 0 0 4px;
+}
+
+.season__slots,
+.season__plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.season__slots li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+
+.season__x {
+  all: unset;
+  margin-left: auto;
+  cursor: pointer;
+  padding: 2px 8px;
+  color: var(--text-muted);
+}
+
+.season__x:hover {
+  color: var(--red);
+}
+
+.season__warn {
+  color: #f0b429;
+  font-weight: 700;
+}
+
+.season__ok {
+  color: var(--teal);
+  font-weight: 700;
+}
+
+.season__result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.season__box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--teal);
+  border-radius: var(--radius);
+}
+
+.season__box--warn {
+  border-left-color: #f0b429;
+}
+
+.season__box h3,
+.season__box h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.season__date {
+  margin-top: 8px !important;
+  color: var(--text-muted);
+}
+
+.season__when {
+  display: inline-block;
+  min-width: 108px;
+  font-variant-numeric: tabular-nums;
+  color: var(--teal);
+  font-weight: 700;
+}
+
+.season__scroll {
+  overflow-x: auto;
+}
+
+.season__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.season__table th,
+.season__table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.season__table tr.is-ours th {
+  color: var(--teal);
+}

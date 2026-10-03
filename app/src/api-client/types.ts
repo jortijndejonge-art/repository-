@@ -2,8 +2,12 @@ import type {
   ChatMessage,
   ChatThread,
   ChatUnread,
+  ApplyMatch,
+  ApplyResult,
   ChaseResult,
   ClubFixture,
+  League,
+  NewLeague,
   NewPitchSlot,
   Pitch,
   PitchSlot,
@@ -82,6 +86,12 @@ export interface ApiClient {
   updateFixture(fixtureId: Id, update: FixtureUpdate, opts?: { force?: boolean }): Promise<Fixture>;
   /** What would clash if a match were saved like this (`id` = the match being edited). */
   checkFixtureConflicts(teamId: Id, candidate: { id?: Id; startsAt: string; durationMinutes: number; pitchId?: Id }): Promise<ScheduleConflict[]>;
+  /** Admin: saved season plans, and creating fixtures for our teams from one. */
+  getLeagues(clubId: Id): Promise<League[]>;
+  addLeague(clubId: Id, league: NewLeague): Promise<League>;
+  updateLeague(leagueId: Id, update: Partial<NewLeague>): Promise<League>;
+  deleteLeague(leagueId: Id): Promise<void>;
+  applyLeague(leagueId: Id, matches: ApplyMatch[]): Promise<ApplyResult>;
   getPitches(clubId: Id): Promise<Pitch[]>;
   addPitch(clubId: Id, name: string): Promise<Pitch>;
   deletePitch(pitchId: Id): Promise<void>;

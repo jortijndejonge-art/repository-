@@ -3,6 +3,8 @@ import type {
   AvailabilityStatus,
   Club,
   Announcement,
+  League,
+  LeagueConfig,
   ClubFixture,
   NewPitchSlot,
   Pitch,
@@ -96,6 +98,13 @@ export interface Repository {
   deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
+
+  // Season plans (Phase 4b)
+  listLeagues(clubId: Id): Promise<League[]>;
+  getLeague(id: Id): Promise<League | null>;
+  addLeague(clubId: Id, name: string, config: LeagueConfig): Promise<League>;
+  updateLeague(id: Id, update: { name?: string; config?: LeagueConfig }): Promise<League | null>;
+  deleteLeague(id: Id): Promise<boolean>;
 
   // Pitches (Phase 4a)
   listPitches(clubId: Id): Promise<Pitch[]>;
@@ -257,6 +266,8 @@ const toFixture = (r: Row): Fixture => ({
   periods: r.periods,
   ...(r.pitch_id ? { pitchId: r.pitch_id } : {}),
 });
+
+const toLeague = (r: Row): League => ({ id: r.id, clubId: r.club_id, name: r.name, config: r.config, updatedAt: r.updated_at });
 
 const toPitchSlot = (r: Row): PitchSlot => ({
   id: r.id,
@@ -545,6 +556,32 @@ export class PgRepository implements Repository {
       [id, ...set.map(([, v]) => v)],
       toFixture,
     );
+  }
+
+  listLeagues(clubId: Id) {
+    return this.many('SELECT * FROM leagues WHERE club_id = $1 ORDER BY updated_at DESC', [clubId], toLeague);
+  }
+
+  getLeague(id: Id) {
+    return this.one('SELECT * FROM leagues WHERE id = $1', [id], toLeague);
+  }
+
+  async addLeague(clubId: Id, name: string, config: LeagueConfig) {
+    const { rows } = await this.pool.query('INSERT INTO leagues (club_id, name, config) VALUES ($1, $2, $3::jsonb) RETURNING *', [clubId, name, JSON.stringify(config)]);
+    return toLeague(rows[0]);
+  }
+
+  async updateLeague(id: Id, u: { name?: string; config?: LeagueConfig }) {
+    return this.one(
+      `UPDATE leagues SET name = COALESCE($2, name), config = COALESCE($3::jsonb, config), updated_at = now() WHERE id = $1 RETURNING *`,
+      [id, u.name ?? null, u.config ? JSON.stringify(u.config) : null],
+      toLeague,
+    );
+  }
+
+  async deleteLeague(id: Id) {
+    const res = await this.pool.query('DELETE FROM leagues WHERE id = $1', [id]);
+    return (res.rowCount ?? 0) > 0;
   }
 
   async listPitches(clubId: Id) {
