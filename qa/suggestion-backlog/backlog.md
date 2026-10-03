@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0021**
+Next free id: **BL-0022**
 
 ---
+
+## BL-0021 — Bulk spreadsheet import (Spond, Teamo, Excel)
+- **Date:** 2026-10-03
+- **Source task:** Plan, "Club onboarding and migration": a forgiving bulk CSV importer, "the single biggest lever" for winning clubs
+- **Idea:** On the Squad screen, Import takes a CSV (upload or paste) and works out the columns from their headings (first/last name or full name, email, phone, team, shirt number, position, parent email and name), copes with semicolons, tabs, quotes and a byte-order mark, tidies shouty names, reads "Goalkeeper / Defender" as positions, and lets the manager correct any column. A preview shows exactly who will be added; lines that cannot be used are listed with their line number and the reason, and never stop the rest. A Team column sends each person to the matching team. An "email is the parent's" option links the address as a parent (children often share a parent's email). New parents (and, optionally, players with an email) get a first password, shown once with a download.
+- **Rationale:** The plan says a club that has to hand-type 200 members will never switch. This is the white-glove import turned into a self-service tool.
+- **Effort estimate:** L
+- **Owning agent:** B (import service, route), C (Import panel), shared engine (parsing)
+- **Status:** Approved — continuing the plan, as the owner asked.
+- **Outcome (2026-10-03):** Done, committed in c5532ab and live. 17 engine tests for parsing and column detection, 7 service tests (duplicates and re-imports are skipped with a reason, one failing row never stops the rest, siblings share one parent), tried in a browser with a deliberately messy file, and on the live site with a duplicate row (nothing created, parents refused with 403). Players come in with neutral ratings (5 of 10) and the position from the file, or midfield. Not built yet: importing fixtures, guessing the age group from a date-of-birth column, and the magic-link invites (they need email).
 
 ## BL-0020 — Phone navigation bar along the bottom
 - **Date:** 2026-10-02
