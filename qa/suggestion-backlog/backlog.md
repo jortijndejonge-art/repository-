@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0024**
+Next free id: **BL-0025**
 
 ---
+
+## BL-0024 — Season planner: schedule a whole season across clubs (Phase 4b)
+- **Date:** 2026-10-03
+- **Source task:** Plan, Phase 4b: "auto-generate a season's fixtures across participating clubs; minimise young players' travel; fairness (home/away balance); only use genuinely free pitch slots; plan the whole season ahead with minimal human interaction"
+- **Idea:** An admin creates a season plan: the season dates and match day, the age-group divisions (with our team in each), and the other clubs typed in by hand (name, miles from us, when their pitch is open, which divisions they enter). "Plan the season" works out every match: who plays whom (everyone once, or home and away), on which date, on which club's pitch and at what time. Matches only use published pitch openings for the age group, never double-book a pitch, never put a team in two matches on a day, keep home and away even for every team, and share travel as evenly as it can; the best of 80 repeatable attempts is kept. The result shows your own matches, a fairness table (played, home, away, away miles per team), the full list by date, and anything it could not place with the reason in plain words. One button creates the fixtures for your own teams, and applying twice is harmless because a team's existing matches at those times are skipped.
+- **Rationale:** This is the plan's "crown jewel", built as an assistant for one club that enters the other clubs by hand. It does not need the other clubs to have accounts, so it is useful before the network exists, and it uses the same pitch and fixture data the rest of the app does.
+- **Effort estimate:** L
+- **Owning agent:** shared engine (round-robin, placement, search), B (plan storage, fixture creation), C (Season planner screen)
+- **Status:** Approved — continuing the plan, as the owner asked.
+- **Outcome (2026-10-03):** Done, committed in 139f845 and live. 25 engine tests (every pair meets once, odd leagues get byes, home/away within one for every league size, no pitch double-booking across divisions, host swap when the home club has no room, unplaced matches reported with reasons, existing bookings respected, repeatable by seed and never worse with more attempts, the maths of the UK clock change) plus 5 service tests; tried end to end in a browser (12 of 12 matches placed, our six alternating home and away, every team 3 home and 3 away); live check with throwaway data (admin only, invalid set-up refused, plan saved and renamed, 2 fixtures created, a second apply created none, a team that is not ours refused). Not built yet: the other clubs having their own accounts and publishing their own pitch times (Phase 4c, so far typed in by hand), travel using real distances between every pair of clubs (only miles from us are entered; the rest is estimated), and re-planning around a match that has already been played.
 
 ## BL-0023 — Pitches, weekly openings, clash warnings and a club schedule (Phase 4a)
 - **Date:** 2026-10-03
