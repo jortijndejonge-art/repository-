@@ -34,9 +34,19 @@ Rejected items are kept for the record, not deleted — just move them to the
 - **Status:** Proposed
 ```
 
-Next free id: **BL-0022**
+Next free id: **BL-0023**
 
 ---
+
+## BL-0022 — Automatic availability chasing
+- **Date:** 2026-10-03
+- **Source task:** Plan, Phase 3: "Automated availability chasing: reminders to players who haven't responded; manager sees a confirmed-count view"
+- **Idea:** The server checks every three hours and, for any match in the next three days where players (or their parents) have not answered, posts a reminder in that match's chat naming who it is still waiting on. Each match is reminded at most once a day. Managers also get a "Remind N who haven't replied" button in the Availability card, which can be pressed again after an hour. When a real email provider is connected, the same reminder is also emailed to those players and their parents (one email each, even for a parent with two children waiting). The confirmed-count view ("9 confirmed, need 2 more") already existed.
+- **Rationale:** Managers should not have to chase by hand. The chat is the in-app channel while email is not yet set up.
+- **Effort estimate:** M
+- **Owning agent:** B (chase service, routes, scheduled check), C (button)
+- **Status:** Approved — continuing the plan, as the owner asked.
+- **Outcome (2026-10-03):** Done, committed in 630bdce and da220a4, live. 8 service tests. A live check with a throwaway match found a real bug (the server tried to email through its own mail service, which cannot send, and that made the request fail after the chat reminder was posted); fixed so a failed email can never fail the reminder, and "email enabled" now needs a real provider (a Resend key or an explicit SMTP host). Re-checked live: reminder posted and visible to a parent, repeat refused, parent refused (403). Note: the automatic check now runs on the live server, so real teams' match chats will show reminders for matches in the next three days. Not built yet: chasing training RSVPs, and nudging in the phone app itself (needs push notifications).
 
 ## BL-0021 — Bulk spreadsheet import (Spond, Teamo, Excel)
 - **Date:** 2026-10-03
