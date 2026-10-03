@@ -1,0 +1,87 @@
+.schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.schedule p {
+  margin: 0;
+}
+
+.schedule__bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.schedule__range {
+  min-width: 130px;
+  text-align: center;
+}
+
+.schedule__summary--bad {
+  color: #f0b429;
+  font-weight: 700;
+}
+
+.schedule__date {
+  margin: 4px 0 8px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.schedule__list,
+.schedule__open {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule__open {
+  margin-top: 8px;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.schedule__match {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 12px;
+  align-items: start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--teal);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.schedule__match.is-clash {
+  border-left-color: #f0b429;
+  background: rgb(240 180 41 / 0.08);
+}
+
+.schedule__time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule__what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.schedule__problem {
+  font-size: 13px;
+  color: #f0b429;
+}

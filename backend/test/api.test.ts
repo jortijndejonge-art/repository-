@@ -674,3 +674,75 @@ describe('event chat', () => {
     expect((await app.inject({ method: 'GET', url: trainingChat, headers: as(p) })).json().messages).toHaveLength(0);
   });
 });
+
+describe('pitches and fixture clashes', () => {
+  it('lets an admin build a pitch with weekly openings, and managers see it', async () => {
+    const coach = await signIn('coach@example.com');
+    const p = await signIn(playerEmail);
+    const club = demo.club.id;
+
+    const made = await app.inject({ method: 'POST', url: `/api/v1/clubs/${club}/pitches`, headers: as(coach), payload: { name: 'Test astro' } });
+    expect(made.statusCode).toBe(201);
+    const pitch = made.json();
+    const slot = await app.inject({
+      method: 'POST',
+      url: `/api/v1/pitches/${pitch.id}/slots`,
+      headers: as(coach),
+      payload: { weekday: 5, startMinute: 540, endMinute: 780, ageGroups: ['U12', 'U12', 'U8'] },
+    });
+    expect(slot.statusCode).toBe(201);
+    expect(slot.json().ageGroups).toEqual(['U12', 'U8']);
+
+    expect((await app.inject({ method: 'POST', url: `/api/v1/pitches/${pitch.id}/slots`, headers: as(coach), payload: { weekday: 5, startMinute: 700, endMinute: 600, ageGroups: ['U12'] } })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'POST', url: `/api/v1/clubs/${club}/pitches`, headers: as(p), payload: { name: 'Nope' } })).statusCode).toBe(403);
+
+    const list = (await app.inject({ method: 'GET', url: `/api/v1/clubs/${club}/pitches`, headers: as(p) })).json();
+    expect(list.find((x: { id: string }) => x.id === pitch.id).slots).toHaveLength(1);
+
+    expect((await app.inject({ method: 'DELETE', url: `/api/v1/pitches/${pitch.id}`, headers: as(coach) })).statusCode).toBe(204);
+  });
+
+  it('refuses a clashing match unless forced, and says what clashes', async () => {
+    const coach = await signIn('coach@example.com');
+    const club = demo.club.id;
+    const pitch = (await app.inject({ method: 'POST', url: `/api/v1/clubs/${club}/pitches`, headers: as(coach), payload: { name: 'Clash astro' } })).json();
+    await app.inject({ method: 'POST', url: `/api/v1/pitches/${pitch.id}/slots`, headers: as(coach), payload: { weekday: 5, startMinute: 540, endMinute: 780, ageGroups: ['U12', 'U16'] } });
+
+    // Saturday 4 May 2030, 10:00 local (BST) = 09:00Z
+    const match = { opponent: 'Clash HC', startsAt: '2030-05-04T09:00:00.000Z', venue: 'Home', homeAway: 'home', format: 7, durationMinutes: 40, periods: 4, pitchId: pitch.id };
+    const first = await app.inject({ method: 'POST', url: '/api/v1/teams/u12/fixtures', headers: as(coach), payload: match });
+    expect(first.statusCode).toBe(201);
+    expect(first.json().pitchId).toBe(pitch.id);
+
+    // Another team on the same pitch at the same time
+    const clash = await app.inject({ method: 'POST', url: '/api/v1/teams/u16/fixtures', headers: as(coach), payload: { ...match, opponent: 'Other HC' } });
+    expect(clash.statusCode).toBe(409);
+    expect(clash.json().conflicts.map((c: { kind: string }) => c.kind)).toContain('pitch');
+
+    const dry = await app.inject({ method: 'POST', url: '/api/v1/teams/u16/fixture-conflicts', headers: as(coach), payload: { startsAt: match.startsAt, durationMinutes: 40, pitchId: pitch.id } });
+    expect(dry.statusCode).toBe(200);
+    expect(dry.json().length).toBeGreaterThan(0);
+
+    const forced = await app.inject({ method: 'POST', url: '/api/v1/teams/u16/fixtures?force=true', headers: as(coach), payload: { ...match, opponent: 'Other HC' } });
+    expect(forced.statusCode).toBe(201);
+
+    // Editing the first match to a free time works, and it does not clash with itself
+    const edit = await app.inject({ method: 'PATCH', url: `/api/v1/fixtures/${first.json().id}`, headers: as(coach), payload: { venue: 'Home pitch' } });
+    expect(edit.statusCode).toBe(409); // still overlapping the forced one
+    const move = await app.inject({ method: 'PATCH', url: `/api/v1/fixtures/${first.json().id}`, headers: as(coach), payload: { startsAt: '2030-05-04T10:00:00.000Z' } });
+    expect(move.statusCode).toBe(200);
+
+    for (const id of [first.json().id, forced.json().id]) await app.inject({ method: 'DELETE', url: `/api/v1/fixtures/${id}`, headers: as(coach) });
+    await app.inject({ method: 'DELETE', url: `/api/v1/pitches/${pitch.id}`, headers: as(coach) });
+  });
+
+  it('shows managers the whole club schedule but not players', async () => {
+    const coach = await signIn('coach@example.com');
+    const p = await signIn(playerEmail);
+    const url = `/api/v1/clubs/${demo.club.id}/schedule?from=${encodeURIComponent('2020-01-01T00:00:00Z')}&to=${encodeURIComponent('2090-01-01T00:00:00Z')}`;
+    const res = await app.inject({ method: 'GET', url, headers: as(coach) });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()[0]).toHaveProperty('teamName');
+    expect((await app.inject({ method: 'GET', url, headers: as(p) })).statusCode).toBe(403);
+  });
+});

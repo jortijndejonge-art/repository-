@@ -137,6 +137,52 @@ export interface Fixture {
   durationMinutes: number;
   /** Number of periods (quarters/halves); substitution windows align to these. */
   periods: number;
+  /** The club pitch it is booked on (home matches). Optional: away matches and unplanned ones have none. */
+  pitchId?: Id;
+}
+
+// ---------------------------------------------------------------------------
+// Pitches and fixture planning (Phase 4a)
+// ---------------------------------------------------------------------------
+
+/** A weekly opening on a pitch for some age groups, in the club's local time. */
+export interface PitchSlot {
+  id: Id;
+  pitchId: Id;
+  /** Monday = 0 … Sunday = 6. */
+  weekday: number;
+  /** Minutes after local midnight, e.g. 540 = 09:00. */
+  startMinute: number;
+  endMinute: number;
+  ageGroups: AgeGroup[];
+}
+
+export interface Pitch {
+  id: Id;
+  clubId: Id;
+  name: string;
+  slots: PitchSlot[];
+}
+
+export interface NewPitch {
+  name: string;
+}
+
+export type NewPitchSlot = Pick<PitchSlot, 'weekday' | 'startMinute' | 'endMinute' | 'ageGroups'>;
+
+/** Something wrong with a proposed match time, in plain words. */
+export interface ScheduleConflict {
+  kind: 'pitch' | 'team' | 'slot';
+  message: string;
+  /** The other match involved, if any. */
+  fixtureId?: Id;
+}
+
+/** A match with its team and pitch names, for club-wide schedule views. */
+export interface ClubFixture extends Fixture {
+  teamName: string;
+  ageGroup: AgeGroup;
+  pitchName?: string;
 }
 
 // ---------------------------------------------------------------------------

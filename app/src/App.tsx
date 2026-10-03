@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Me } from '@hockey/contracts';
-import { AuthProvider, managedTeams, playingTeams, useAuth } from './core/auth';
+import { AuthProvider, isClubAdmin, managedTeams, playingTeams, useAuth } from './core/auth';
 import { ToastProvider } from './core/Toast';
 import { SignIn } from './screens/auth/SignIn';
 import { Verify } from './screens/auth/Verify';
@@ -14,6 +14,8 @@ import { Family } from './screens/family/Family';
 import { Fixtures } from './screens/fixtures/Fixtures';
 import { LineupPlanner } from './screens/lineup/LineupPlanner';
 import { Matchday } from './screens/matchday/Matchday';
+import { Pitches } from './screens/pitches/Pitches';
+import { Schedule } from './screens/schedule/Schedule';
 import { Account } from './screens/account/Account';
 import { Membership } from './screens/membership/Membership';
 import { Squad } from './screens/squad/Squad';
@@ -54,7 +56,7 @@ function Root() {
   return <Shell me={me} />;
 }
 
-export type Tab = 'chats' | 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'matchday' | 'stats' | 'training' | 'membership' | 'account';
+export type Tab = 'chats' | 'family' | 'announcements' | 'calendar' | 'matches' | 'lineup' | 'squad' | 'fixtures' | 'schedule' | 'pitches' | 'matchday' | 'stats' | 'training' | 'membership' | 'account';
 
 function Shell({ me }: { me: Me }) {
   const { signOut } = useAuth();
@@ -91,6 +93,8 @@ function Shell({ me }: { me: Me }) {
     ...(plays ? [{ id: 'matches' as const, label: 'My matches' }] : []),
     ...(canManage ? [{ id: 'lineup' as const, label: 'Lineup planner' }] : []),
     ...(canManage ? [{ id: 'fixtures' as const, label: 'Fixtures' }] : []),
+    ...(canManage ? [{ id: 'schedule' as const, label: 'Club schedule' }] : []),
+    ...(isClubAdmin(me) ? [{ id: 'pitches' as const, label: 'Pitches' }] : []),
     ...(canManage ? [{ id: 'matchday' as const, label: 'Matchday' }] : []),
     ...(canManage || plays ? [{ id: 'training' as const, label: 'Training' }] : []),
     ...(canManage ? [{ id: 'stats' as const, label: 'Stats' }] : []),
@@ -153,6 +157,8 @@ function Shell({ me }: { me: Me }) {
 
       {tab === 'lineup' && canManage && <LineupPlanner me={me} />}
       {tab === 'fixtures' && canManage && <Fixtures me={me} />}
+      {tab === 'schedule' && canManage && <Schedule me={me} />}
+      {tab === 'pitches' && isClubAdmin(me) && <Pitches me={me} />}
       {tab === 'matchday' && canManage && <Matchday me={me} />}
       {tab === 'training' && <Training me={me} />}
       {tab === 'stats' && canManage && <Stats me={me} />}

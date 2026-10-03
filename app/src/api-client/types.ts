@@ -3,6 +3,11 @@ import type {
   ChatThread,
   ChatUnread,
   ChaseResult,
+  ClubFixture,
+  NewPitchSlot,
+  Pitch,
+  PitchSlot,
+  ScheduleConflict,
   EventKind,
   ImportRequest,
   ImportResult,
@@ -72,8 +77,18 @@ export interface ApiClient {
   /** Real mode returns a Stripe page to send the member to; demo mode simulates the payment. */
   startCheckout(planId: Id): Promise<CheckoutSession>;
   getFixtures(teamId: Id, from?: string): Promise<Fixture[]>;
-  addFixture(teamId: Id, fixture: NewFixture): Promise<Fixture>;
-  updateFixture(fixtureId: Id, update: FixtureUpdate): Promise<Fixture>;
+  /** A clashing time is refused with a 409 (see `clashesOf`) unless `force` is set. */
+  addFixture(teamId: Id, fixture: NewFixture, opts?: { force?: boolean }): Promise<Fixture>;
+  updateFixture(fixtureId: Id, update: FixtureUpdate, opts?: { force?: boolean }): Promise<Fixture>;
+  /** What would clash if a match were saved like this (`id` = the match being edited). */
+  checkFixtureConflicts(teamId: Id, candidate: { id?: Id; startsAt: string; durationMinutes: number; pitchId?: Id }): Promise<ScheduleConflict[]>;
+  getPitches(clubId: Id): Promise<Pitch[]>;
+  addPitch(clubId: Id, name: string): Promise<Pitch>;
+  deletePitch(pitchId: Id): Promise<void>;
+  addPitchSlot(pitchId: Id, slot: NewPitchSlot): Promise<PitchSlot>;
+  deletePitchSlot(slotId: Id): Promise<void>;
+  /** Manager: every team's matches in a stretch of time. */
+  getClubSchedule(clubId: Id, from: string, to: string): Promise<ClubFixture[]>;
   deleteFixture(fixtureId: Id): Promise<void>;
   /** Manager: remind everyone who has not said whether they can play (posted in the match chat). */
   chaseAvailability(fixtureId: Id): Promise<ChaseResult>;
@@ -132,7 +147,15 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Extra detail from the server, e.g. the clashes behind a 409. */
+    readonly details?: unknown,
   ) {
     super(message);
   }
+}
+
+/** The clashes a 409 from saving a match carries, if it carries any. */
+export function clashesOf(err: unknown): ScheduleConflict[] | null {
+  const details = err instanceof ApiError ? (err.details as { conflicts?: ScheduleConflict[] } | undefined) : undefined;
+  return details?.conflicts ?? null;
 }

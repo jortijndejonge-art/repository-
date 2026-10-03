@@ -102,3 +102,30 @@
     grid-template-columns: 1fr;
   }
 }
+
+.fixture-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fixture-suggest__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fixture-clash {
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border: 1px solid #f0b429;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: rgb(240 180 41 / 0.08);
+}
+
+.fixture-clash ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+}

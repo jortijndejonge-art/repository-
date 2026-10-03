@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Fixture, Id, Me, NewFixture } from '@hockey/contracts';
+import type { ClubFixture, Fixture, Id, Me, NewFixture, Pitch } from '@hockey/contracts';
 import { api } from '../../api-client';
 import { managedTeams } from '../../core/auth';
 import { useToast } from '../../core/Toast';
@@ -17,7 +17,17 @@ export function Fixtures({ me }: { me: Me }) {
   const [fixtures, setFixtures] = useState<Fixture[] | null>(null);
   const [dialog, setDialog] = useState<{ fixture?: Fixture } | null>(null);
   const [briefingFor, setBriefingFor] = useState<Fixture | null>(null);
+  const [pitches, setPitches] = useState<Pitch[]>([]);
+  const [clubFixtures, setClubFixtures] = useState<ClubFixture[]>([]);
   const team = teams.find((t) => t.id === teamId);
+
+  // The club's pitches and coming matches, so the form can warn about clashes and suggest free times.
+  useEffect(() => {
+    const from = new Date().toISOString();
+    const to = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    api.getPitches(me.club.id).then(setPitches).catch(() => setPitches([]));
+    api.getClubSchedule(me.club.id, from, to).then(setClubFixtures).catch(() => setClubFixtures([]));
+  }, [me.club.id, fixtures]);
 
   const load = useCallback(async () => {
     if (!teamId) return;
@@ -31,14 +41,14 @@ export function Fixtures({ me }: { me: Me }) {
 
   if (teams.length === 0) return <p className="muted">You don&apos;t manage any teams yet.</p>;
 
-  const save = async (input: NewFixture) => {
+  const save = async (input: NewFixture, opts?: { force?: boolean }) => {
     const editing = dialog?.fixture;
     if (editing) {
-      const updated = await api.updateFixture(editing.id, input);
+      const updated = await api.updateFixture(editing.id, input, opts);
       setFixtures((cur) => cur?.map((f) => (f.id === updated.id ? updated : f)).sort(byStart) ?? cur);
       toast('Fixture saved');
     } else {
-      const added = await api.addFixture(teamId, input);
+      const added = await api.addFixture(teamId, input, opts);
       setFixtures((cur) => [...(cur ?? []), added].sort(byStart));
       toast(`Added ${added.opponent}`);
     }
@@ -91,7 +101,7 @@ export function Fixtures({ me }: { me: Me }) {
                   <span className="fixtures__ha">{f.homeAway === 'home' ? 'Home' : 'Away'}</span> vs {f.opponent}
                 </div>
                 <div className="muted small">
-                  {when(f.startsAt)} · {f.venue} · {f.format}-a-side · {f.durationMinutes} min ({f.periods} periods)
+                  {when(f.startsAt)} · {pitches.find((p) => p.id === f.pitchId)?.name ?? f.venue} · {f.format}-a-side · {f.durationMinutes} min ({f.periods} periods)
                 </div>
               </div>
               <div className="fixtures__actions">
@@ -115,7 +125,9 @@ export function Fixtures({ me }: { me: Me }) {
       {dialog && team && (
         <FixtureDialog
           fixture={dialog.fixture}
-          defaultFormat={team.defaultFormat}
+          team={team}
+          pitches={pitches}
+          clubFixtures={clubFixtures}
           onCancel={() => setDialog(null)}
           onSave={save}
         />

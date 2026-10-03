@@ -11,6 +11,8 @@ const paths: Record<string, string> = {
   fixtures: 'M5 4h14v16H5zM9 8h6m-6 4h6m-6 4h4',
   matchday: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-12v4l3 2M10 2h4',
   stats: 'M4 20V10m6 10V4m6 16v-7m4 7H2',
+  schedule: 'M3 4h18v16H3zM3 9h18M9 4v16M3 14.5h18',
+  pitches: 'M3 6h18v12H3zM12 6v12M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z',
   membership: 'M3 6h18v12H3zM3 10h18M7 15h4',
   account: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9v-1a7 7 0 0 1 14 0v1',
   more: 'M5 12h.01M12 12h.01M19 12h.01',

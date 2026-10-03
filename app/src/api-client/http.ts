@@ -21,7 +21,7 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
         token = null;
         sessionStore.clear();
       }
-      throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+      throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText, data);
     }
     return data as T;
   }
@@ -70,8 +70,15 @@ export function createHttpClient(baseUrl = `${import.meta.env.BASE_URL}api/v1`):
     startCheckout: (planId) => request('POST', `/membership-plans/${enc(planId)}/checkout`),
     getFixtures: (teamId, from) =>
       request('GET', `/teams/${enc(teamId)}/fixtures${from ? `?from=${enc(from)}` : ''}`),
-    addFixture: (teamId, fixture) => request('POST', `/teams/${enc(teamId)}/fixtures`, fixture),
-    updateFixture: (fixtureId, update) => request('PATCH', `/fixtures/${enc(fixtureId)}`, update),
+    addFixture: (teamId, fixture, opts) => request('POST', `/teams/${enc(teamId)}/fixtures${opts?.force ? '?force=true' : ''}`, fixture),
+    updateFixture: (fixtureId, update, opts) => request('PATCH', `/fixtures/${enc(fixtureId)}${opts?.force ? '?force=true' : ''}`, update),
+    checkFixtureConflicts: (teamId, candidate) => request('POST', `/teams/${enc(teamId)}/fixture-conflicts`, candidate),
+    getPitches: (clubId) => request('GET', `/clubs/${enc(clubId)}/pitches`),
+    addPitch: (clubId, name) => request('POST', `/clubs/${enc(clubId)}/pitches`, { name }),
+    deletePitch: (pitchId) => request('DELETE', `/pitches/${enc(pitchId)}`),
+    addPitchSlot: (pitchId, slot) => request('POST', `/pitches/${enc(pitchId)}/slots`, slot),
+    deletePitchSlot: (slotId) => request('DELETE', `/pitch-slots/${enc(slotId)}`),
+    getClubSchedule: (clubId, from, to) => request('GET', `/clubs/${enc(clubId)}/schedule?from=${enc(from)}&to=${enc(to)}`),
     deleteFixture: (fixtureId) => request('DELETE', `/fixtures/${enc(fixtureId)}`),
     chaseAvailability: (fixtureId) => request('POST', `/fixtures/${enc(fixtureId)}/chase`),
     importPlayers: (teamId, body) => request('POST', `/teams/${enc(teamId)}/import`, body),

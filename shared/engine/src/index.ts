@@ -5,3 +5,4 @@ export * from './matchday';
 export * from './subplan';
 export * from './rotation';
 export * from './importer';
+export * from './schedule';

@@ -1,6 +1,6 @@
-import type { ChaseResult, ChatMessage, EventKind, ImportResult, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
+import type { ChaseResult, ClubFixture, Pitch, PitchSlot, ChatMessage, EventKind, ImportResult, LineupCard, Announcement, Briefing, GuardianSummary, LiveMatch, LiveSubstitution, Availability, Fixture, TrainingResponse, TrainingSession, Formation, FormationLayout, Id, Lineup, Me, MembershipPlan, MembershipRecord, PlayerProfile } from '@hockey/contracts';
 import * as demo from '@hockey/demo';
-import { benchNow, pitchAt, secondsPlayed, minutesFromPlan, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
+import { findConflicts, benchNow, pitchAt, secondsPlayed, minutesFromPlan, buildCustomFormationSlots, formationsFor, getFormation, suggestLineup, validateLineCounts } from '@hockey/engine';
 import { sessionStore } from './session';
 import { ApiError, type ApiClient } from './types';
 
@@ -16,6 +16,7 @@ export function createMockClient(): ApiClient {
   const chatReads = new Map<string, string>();
   const fixtures: Fixture[] = demo.fixtures.map((f) => ({ ...f }));
   const announcements: Announcement[] = [];
+  const pitches: Pitch[] = [];
   const briefings = new Map<Id, Briefing>();
   const briefingSeen = new Map<string, string>(); // "fixtureId/memberId" -> when read
   // Live matches: playing time banked before the clock was last started, and when it was started (ms).
@@ -40,6 +41,16 @@ export function createMockClient(): ApiClient {
   let memberId: Id | null = sessionStore.get()?.replace(/^mock:/, '') ?? null;
 
   const delay = <T>(value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(value), 60));
+  const conflictsFor = (teamId: Id, candidate: { id?: Id; startsAt: string; durationMinutes: number; pitchId?: Id }) => {
+    const team = demo.teams.find((t) => t.id === teamId);
+    return findConflicts({
+      candidate: { id: candidate.id ?? '__new__', teamId, ageGroup: team?.ageGroup ?? 'Adult', startsAt: candidate.startsAt, durationMinutes: candidate.durationMinutes, ...(candidate.pitchId ? { pitchId: candidate.pitchId } : {}) },
+      fixtures,
+      trainings: trainingSessions,
+      pitches,
+      timeZone: 'Europe/London',
+    });
+  };
   const fixture = (id: Id) => {
     const f = fixtures.find((x) => x.id === id);
     if (!f) throw new ApiError(404, 'Fixture not found');
@@ -393,15 +404,68 @@ export function createMockClient(): ApiClient {
           .map((f) => ({ ...f })),
       );
     },
-    async addFixture(teamId, input) {
+    async addFixture(teamId, input, opts) {
+      if (!opts?.force) {
+        const conflicts = conflictsFor(teamId, { startsAt: input.startsAt, durationMinutes: input.durationMinutes, pitchId: input.pitchId });
+        if (conflicts.length) throw new ApiError(409, 'That time clashes with something else.', { conflicts });
+      }
       const created: Fixture = { id: `fx-${Date.now().toString(36)}`, teamId, ...input };
+      if (!created.pitchId) delete created.pitchId;
       fixtures.push(created);
       return delay({ ...created });
     },
-    async updateFixture(id, update) {
+    async updateFixture(id, update, opts) {
       const f = fixture(id);
+      const merged = { ...f, ...update };
+      if (!opts?.force) {
+        const conflicts = conflictsFor(f.teamId, { id, startsAt: merged.startsAt, durationMinutes: merged.durationMinutes, pitchId: merged.pitchId });
+        if (conflicts.length) throw new ApiError(409, 'That time clashes with something else.', { conflicts });
+      }
       Object.assign(f, update);
+      if (!f.pitchId) delete f.pitchId;
       return delay({ ...f });
+    },
+    async checkFixtureConflicts(teamId, candidate) {
+      return delay(conflictsFor(teamId, candidate));
+    },
+    async getPitches() {
+      return delay(pitches.map((p) => ({ ...p, slots: p.slots.map((s) => ({ ...s })) })));
+    },
+    async addPitch(clubId, name) {
+      const created: Pitch = { id: `pitch-${Date.now().toString(36)}`, clubId, name, slots: [] };
+      pitches.push(created);
+      return delay({ ...created });
+    },
+    async deletePitch(pitchId) {
+      const at = pitches.findIndex((p) => p.id === pitchId);
+      if (at < 0) throw new ApiError(404, 'Pitch not found');
+      pitches.splice(at, 1);
+      for (const f of fixtures) if (f.pitchId === pitchId) delete f.pitchId;
+      return delay(undefined);
+    },
+    async addPitchSlot(pitchId, slot) {
+      const pitch = pitches.find((p) => p.id === pitchId);
+      if (!pitch) throw new ApiError(404, 'Pitch not found');
+      if (slot.endMinute <= slot.startMinute) throw new ApiError(400, 'The opening must end after it starts');
+      const created: PitchSlot = { id: `slot-${Date.now().toString(36)}-${pitch.slots.length}`, pitchId, ...slot, ageGroups: [...new Set(slot.ageGroups)] };
+      pitch.slots.push(created);
+      pitch.slots.sort((a, b) => a.weekday - b.weekday || a.startMinute - b.startMinute);
+      return delay({ ...created });
+    },
+    async deletePitchSlot(slotId) {
+      for (const p of pitches) p.slots = p.slots.filter((s) => s.id !== slotId);
+      return delay(undefined);
+    },
+    async getClubSchedule(_clubId, from, to) {
+      const list: ClubFixture[] = fixtures
+        .filter((f) => f.startsAt >= from && f.startsAt < to)
+        .map((f) => {
+          const team = demo.teams.find((t) => t.id === f.teamId);
+          const pitch = pitches.find((p) => p.id === f.pitchId);
+          return { ...f, teamName: team?.name ?? '', ageGroup: team?.ageGroup ?? 'Adult', ...(pitch ? { pitchName: pitch.name } : {}) };
+        })
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      return delay(list);
     },
     async deleteFixture(id) {
       const at = fixtures.findIndex((f) => f.id === id);

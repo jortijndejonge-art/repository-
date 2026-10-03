@@ -3,6 +3,10 @@ import type {
   AvailabilityStatus,
   Club,
   Announcement,
+  ClubFixture,
+  NewPitchSlot,
+  Pitch,
+  PitchSlot,
   PlayerStats,
   Briefing,
   NewBriefing,
@@ -92,6 +96,19 @@ export interface Repository {
   deleteFixture(id: Id): Promise<boolean>;
   listAvailability(fixtureId: Id): Promise<Availability[]>;
   setAvailability(fixtureId: Id, memberId: Id, status: AvailabilityStatus, note?: string): Promise<Availability>;
+
+  // Pitches (Phase 4a)
+  listPitches(clubId: Id): Promise<Pitch[]>;
+  getPitch(id: Id): Promise<Pitch | null>;
+  addPitch(clubId: Id, name: string): Promise<Pitch>;
+  deletePitch(id: Id): Promise<boolean>;
+  addPitchSlot(pitchId: Id, slot: NewPitchSlot): Promise<PitchSlot>;
+  /** The pitch a slot belongs to, for permission checks. */
+  getPitchSlotPitchId(slotId: Id): Promise<Id | null>;
+  deletePitchSlot(id: Id): Promise<boolean>;
+  /** Every match of every team in the club starting in [from, to), with team and pitch names. */
+  listClubFixtures(clubId: Id, from: Date, to: Date): Promise<ClubFixture[]>;
+  getClubTimezone(clubId: Id): Promise<string>;
 
   // Season stats
   /** Attendance, availability and minutes for every player in a team, counting only things before `now`. */
@@ -238,6 +255,16 @@ const toFixture = (r: Row): Fixture => ({
   format: r.format as SquadFormat,
   durationMinutes: r.duration_minutes,
   periods: r.periods,
+  ...(r.pitch_id ? { pitchId: r.pitch_id } : {}),
+});
+
+const toPitchSlot = (r: Row): PitchSlot => ({
+  id: r.id,
+  pitchId: r.pitch_id,
+  weekday: r.weekday,
+  startMinute: r.start_minute,
+  endMinute: r.end_minute,
+  ageGroups: r.age_groups,
 });
 
 const ANNOUNCEMENT_SELECT = `SELECT a.*, COALESCE(m.first_name || ' ' || m.last_name, 'The club') AS author_name
@@ -492,9 +519,9 @@ export class PgRepository implements Repository {
 
   async addFixture(teamId: Id, f: NewFixture) {
     const { rows } = await this.pool.query(
-      `INSERT INTO fixtures (team_id, opponent, starts_at, venue, home_away, format, duration_minutes, periods)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [teamId, f.opponent, f.startsAt, f.venue, f.homeAway, f.format, f.durationMinutes, f.periods],
+      `INSERT INTO fixtures (team_id, opponent, starts_at, venue, home_away, format, duration_minutes, periods, pitch_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [teamId, f.opponent, f.startsAt, f.venue, f.homeAway, f.format, f.durationMinutes, f.periods, f.pitchId || null],
     );
     return toFixture(rows[0]);
   }
@@ -508,6 +535,8 @@ export class PgRepository implements Repository {
       format: u.format,
       duration_minutes: u.durationMinutes,
       periods: u.periods,
+      // An empty id clears the booking.
+      pitch_id: u.pitchId === undefined ? undefined : u.pitchId || null,
     };
     const set = Object.entries(columns).filter(([, v]) => v !== undefined);
     if (set.length === 0) return this.getFixture(id);
@@ -516,6 +545,73 @@ export class PgRepository implements Repository {
       [id, ...set.map(([, v]) => v)],
       toFixture,
     );
+  }
+
+  async listPitches(clubId: Id) {
+    const [pitches, slots] = await Promise.all([
+      this.pool.query('SELECT * FROM pitches WHERE club_id = $1 ORDER BY name', [clubId]),
+      this.pool.query(
+        `SELECT s.* FROM pitch_slots s JOIN pitches p ON p.id = s.pitch_id WHERE p.club_id = $1 ORDER BY s.weekday, s.start_minute`,
+        [clubId],
+      ),
+    ]);
+    return pitches.rows.map((p) => ({
+      id: p.id as Id,
+      clubId: p.club_id as Id,
+      name: p.name as string,
+      slots: slots.rows.filter((s) => s.pitch_id === p.id).map(toPitchSlot),
+    }));
+  }
+
+  async getPitch(id: Id) {
+    const pitch = (await this.pool.query('SELECT * FROM pitches WHERE id = $1', [id])).rows[0];
+    if (!pitch) return null;
+    const slots = await this.pool.query('SELECT * FROM pitch_slots WHERE pitch_id = $1 ORDER BY weekday, start_minute', [id]);
+    return { id: pitch.id as Id, clubId: pitch.club_id as Id, name: pitch.name as string, slots: slots.rows.map(toPitchSlot) };
+  }
+
+  async addPitch(clubId: Id, name: string) {
+    const { rows } = await this.pool.query('INSERT INTO pitches (club_id, name) VALUES ($1, $2) RETURNING *', [clubId, name]);
+    return { id: rows[0].id as Id, clubId, name, slots: [] };
+  }
+
+  async deletePitch(id: Id) {
+    const res = await this.pool.query('DELETE FROM pitches WHERE id = $1', [id]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  async addPitchSlot(pitchId: Id, s: NewPitchSlot) {
+    const { rows } = await this.pool.query(
+      'INSERT INTO pitch_slots (pitch_id, weekday, start_minute, end_minute, age_groups) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [pitchId, s.weekday, s.startMinute, s.endMinute, s.ageGroups],
+    );
+    return toPitchSlot(rows[0]);
+  }
+
+  async getPitchSlotPitchId(slotId: Id) {
+    return (await this.one('SELECT pitch_id FROM pitch_slots WHERE id = $1', [slotId], (r) => r.pitch_id as Id)) ?? null;
+  }
+
+  async deletePitchSlot(id: Id) {
+    const res = await this.pool.query('DELETE FROM pitch_slots WHERE id = $1', [id]);
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  listClubFixtures(clubId: Id, from: Date, to: Date) {
+    return this.many(
+      `SELECT f.*, t.name AS team_name, t.age_group, p.name AS pitch_name
+         FROM fixtures f
+         JOIN teams t ON t.id = f.team_id
+         LEFT JOIN pitches p ON p.id = f.pitch_id
+        WHERE t.club_id = $1 AND f.starts_at >= $2 AND f.starts_at < $3
+        ORDER BY f.starts_at, t.name`,
+      [clubId, from, to],
+      (r) => ({ ...toFixture(r), teamName: r.team_name as string, ageGroup: r.age_group, ...(r.pitch_name ? { pitchName: r.pitch_name as string } : {}) }),
+    );
+  }
+
+  async getClubTimezone(clubId: Id) {
+    return (await this.one('SELECT timezone FROM clubs WHERE id = $1', [clubId], (r) => r.timezone as string)) ?? 'Europe/London';
   }
 
   async deleteFixture(id: Id) {

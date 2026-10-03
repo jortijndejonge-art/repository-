@@ -7,6 +7,7 @@ import type {
   NewCustomFormation,
   ImportRequest,
   NewAnnouncement,
+  NewPitchSlot,
   NewBriefing,
   NewGuardian,
   NewFixture,
@@ -32,6 +33,7 @@ import { LineupService } from './services/lineups';
 import { ChaseService } from './services/chase';
 import { ChatService } from './services/chat';
 import { LiveService } from './services/live';
+import { ScheduleService } from './services/schedule';
 import { TrainingService } from './services/training';
 import type { Mailer } from './services/mailer';
 import { DisabledProvider, PaymentService, type PaymentProvider } from './services/payments';
@@ -79,6 +81,7 @@ const substitution = {
   },
 } as const;
 const fixtureProps = {
+  pitchId: { type: 'string', maxLength: 80 },
   opponent: { type: 'string', minLength: 1, maxLength: 120 },
   startsAt: { type: 'string', format: 'date-time' },
   venue: { type: 'string', minLength: 1, maxLength: 160 },
@@ -104,6 +107,7 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
   const training = new TrainingService(repo);
   const live = new LiveService(repo);
   const importer = new ImportService(repo, auth);
+  const schedule = new ScheduleService(repo);
   const chaser = new ChaseService(repo, mailer, config.appUrl, emailEnabled);
   const briefings = new BriefingService(repo);
   const paymentService = new PaymentService(repo, payments, mailer, config.appUrl);
@@ -386,10 +390,11 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
         },
       );
 
-      api.post<{ Params: { teamId: Id }; Body: NewFixture }>(
+      api.post<{ Params: { teamId: Id }; Querystring: { force?: boolean }; Body: NewFixture }>(
         '/teams/:teamId/fixtures',
         {
           schema: {
+            querystring: { type: 'object', properties: { force: { type: 'boolean' } } },
             body: {
               type: 'object',
               required: ['opponent', 'startsAt', 'venue', 'homeAway', 'format', 'durationMinutes', 'periods'],
@@ -400,16 +405,47 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
         },
         async (req, reply) => {
           await access.requireManager(await signedIn(req), req.params.teamId);
+          if (!req.query.force) {
+            const conflicts = await schedule.conflictsFor(req.params.teamId, req.body);
+            if (conflicts.length) return reply.code(409).send({ error: 'That time clashes with something else.', conflicts });
+          }
           reply.code(201);
           return repo.addFixture(req.params.teamId, req.body);
         },
       );
 
-      api.patch<{ Params: { fixtureId: Id }; Body: FixtureUpdate }>(
-        '/fixtures/:fixtureId',
-        { schema: { body: { type: 'object', additionalProperties: false, properties: fixtureProps } } },
+      // Dry run for the fixture form: what would clash if this match were saved (id = the match being edited).
+      api.post<{ Params: { teamId: Id }; Body: { id?: Id; startsAt: string; durationMinutes: number; pitchId?: Id } }>(
+        '/teams/:teamId/fixture-conflicts',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['startsAt', 'durationMinutes'],
+              additionalProperties: false,
+              properties: { id: { type: 'string' }, startsAt: fixtureProps.startsAt, durationMinutes: fixtureProps.durationMinutes, pitchId: fixtureProps.pitchId },
+            },
+          },
+        },
         async (req) => {
-          await access.requireManager(await signedIn(req), await fixtureTeam(req.params.fixtureId));
+          await access.requireManager(await signedIn(req), req.params.teamId);
+          return schedule.conflictsFor(req.params.teamId, req.body);
+        },
+      );
+
+      api.patch<{ Params: { fixtureId: Id }; Querystring: { force?: boolean }; Body: FixtureUpdate }>(
+        '/fixtures/:fixtureId',
+        { schema: { querystring: { type: 'object', properties: { force: { type: 'boolean' } } }, body: { type: 'object', additionalProperties: false, properties: fixtureProps } } },
+        async (req, reply) => {
+          const teamId = await fixtureTeam(req.params.fixtureId);
+          await access.requireManager(await signedIn(req), teamId);
+          if (!req.query.force) {
+            const current = await repo.getFixture(req.params.fixtureId);
+            if (!current) throw notFound('Fixture not found');
+            const merged = { ...current, ...req.body };
+            const conflicts = await schedule.conflictsFor(teamId, { id: current.id, startsAt: merged.startsAt, durationMinutes: merged.durationMinutes, pitchId: merged.pitchId });
+            if (conflicts.length) return reply.code(409).send({ error: 'That time clashes with something else.', conflicts });
+          }
           return (await repo.updateFixture(req.params.fixtureId, req.body)) ?? Promise.reject(notFound('Fixture not found'));
         },
       );
@@ -771,6 +807,86 @@ export function buildApp({ repo, mailer, emailEnabled = false, config, payments 
 
       api.get<{ Params: { teamId: Id } }>('/teams/:teamId/chat-unread', async (req) =>
         chat.unread(req.params.teamId, await signedIn(req)),
+      );
+
+      // ---- Pitches and the club schedule (Phase 4a) -----------------------------------
+      api.get<{ Params: { clubId: Id } }>('/clubs/:clubId/pitches', async (req) => {
+        await access.requireClubMember(await signedIn(req), req.params.clubId);
+        return repo.listPitches(req.params.clubId);
+      });
+
+      api.post<{ Params: { clubId: Id }; Body: { name: string } }>(
+        '/clubs/:clubId/pitches',
+        { schema: { body: { type: 'object', required: ['name'], additionalProperties: false, properties: { name: { type: 'string', minLength: 1, maxLength: 80 } } } } },
+        async (req, reply) => {
+          await access.requireClubAdmin(await signedIn(req), req.params.clubId);
+          reply.code(201);
+          return repo.addPitch(req.params.clubId, req.body.name.trim());
+        },
+      );
+
+      api.delete<{ Params: { pitchId: Id } }>('/pitches/:pitchId', async (req, reply) => {
+        const pitch = await repo.getPitch(req.params.pitchId);
+        if (!pitch) throw notFound('Pitch not found');
+        await access.requireClubAdmin(await signedIn(req), pitch.clubId);
+        await repo.deletePitch(pitch.id);
+        return reply.code(204).send();
+      });
+
+      api.post<{ Params: { pitchId: Id }; Body: NewPitchSlot }>(
+        '/pitches/:pitchId/slots',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['weekday', 'startMinute', 'endMinute', 'ageGroups'],
+              additionalProperties: false,
+              properties: {
+                weekday: { type: 'integer', minimum: 0, maximum: 6 },
+                startMinute: { type: 'integer', minimum: 0, maximum: 1439 },
+                endMinute: { type: 'integer', minimum: 1, maximum: 1440 },
+                ageGroups: { type: 'array', minItems: 1, items: { enum: ['U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'Adult'] } },
+              },
+            },
+          },
+        },
+        async (req, reply) => {
+          const pitch = await repo.getPitch(req.params.pitchId);
+          if (!pitch) throw notFound('Pitch not found');
+          await access.requireClubAdmin(await signedIn(req), pitch.clubId);
+          if (req.body.endMinute <= req.body.startMinute) throw badRequest('The opening must end after it starts');
+          reply.code(201);
+          return repo.addPitchSlot(pitch.id, { ...req.body, ageGroups: [...new Set(req.body.ageGroups)] });
+        },
+      );
+
+      api.delete<{ Params: { slotId: Id } }>('/pitch-slots/:slotId', async (req, reply) => {
+        const pitchId = await repo.getPitchSlotPitchId(req.params.slotId);
+        const pitch = pitchId ? await repo.getPitch(pitchId) : null;
+        if (!pitch) throw notFound('Opening not found');
+        await access.requireClubAdmin(await signedIn(req), pitch.clubId);
+        await repo.deletePitchSlot(req.params.slotId);
+        return reply.code(204).send();
+      });
+
+      // Every team's matches for a stretch of time, for the club-wide schedule. Managers and admins only.
+      api.get<{ Params: { clubId: Id }; Querystring: { from: string; to: string } }>(
+        '/clubs/:clubId/schedule',
+        {
+          schema: {
+            querystring: { type: 'object', required: ['from', 'to'], properties: { from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' } } },
+          },
+        },
+        async (req) => {
+          const actor = await signedIn(req);
+          await access.requireClubMember(actor, req.params.clubId);
+          const managing = (await repo.listMemberships(actor)).some((m) => m.roles.includes('manager') || m.roles.includes('admin'));
+          if (!managing) throw forbidden('Only managers can see the club schedule');
+          const from = new Date(req.query.from);
+          const to = new Date(req.query.to);
+          if (to.getTime() - from.getTime() > 120 * 86_400_000) throw badRequest('Ask for 120 days or fewer at a time');
+          return repo.listClubFixtures(req.params.clubId, from, to);
+        },
       );
 
       // ---- Availability chasing (Phase 3) --------------------------------------------
